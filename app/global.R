@@ -20,27 +20,26 @@ library(lubridate)
 library(here)
 
 
-# ==============================================================
+#==============================================================
 # 1. DATA
-# ==============================================================
-
+#==============================================================
 
 # ── Colour palette (one per elephant) ─────────────────────────────────────────
 ELEPHANT_COLOURS <- c(
-  Talatha             = "#E63946",
-  Pazhani             = "#457B9D",
+  Talatha = "#E63946",
+  Pazhani = "#457B9D",
   `recollared female` = "#2A9D8F",
-  Rahu                = "#F4A261",
-  Kasun               = "#9B2226",
-  Dona                = "#6A0572",
-  Mina                = "#0096C7",
-  Illuk               = "#52B788",
-  Dewmi               = "#F77F00",
-  Gothami             = "#CB4335",
-  Wilmini             = "#1B4332",
-  female_1            = "#B5838D",
-  `Tara Devi`         = "#D4A017",
-  Damien              = "#3D405B"
+  Rahu = "#F4A261",
+  Kasun = "#9B2226",
+  Dona = "#6A0572",
+  Mina = "#0096C7",
+  Illuk = "#52B788",
+  Dewmi = "#F77F00",
+  Gothami = "#CB4335",
+  Wilmini = "#1B4332",
+  female_1 = "#B5838D",
+  `Tara Devi` = "#D4A017",
+  Damien = "#3D405B"
 )
 
 # ── Load data ──────────────────────────────────────────────────────────────────
@@ -72,7 +71,9 @@ assign_track_segments <- function(d, time_col = "datetime_sl") {
   }
   gaps <- as.numeric(difftime(d[[time_col]][-1], d[[time_col]][-nrow(d)], units = "secs"))
   med <- median(gaps[gaps > 0], na.rm = TRUE)
-  if (!is.finite(med)) med <- 3600
+  if (!is.finite(med)) {
+    med <- 3600
+  }
   thr <- max(med * 4, 6 * 3600)
   d$seg <- c(1L, cumsum(gaps > thr) + 1L)
   d
@@ -88,21 +89,26 @@ insert_gaps <- function(d, time_col = "datetime_sl", cols = c("lat", "lon")) {
   }
   gaps <- as.numeric(difftime(d[[time_col]][-1], d[[time_col]][-nrow(d)], units = "secs"))
   med <- median(gaps[gaps > 0], na.rm = TRUE)
-  if (!is.finite(med)) med <- 3600
+  if (!is.finite(med)) {
+    med <- 3600
+  }
   big <- which(gaps > max(med * 4, 6 * 3600))
   if (!length(big)) {
     return(d)
   }
   na_rows <- d[big, , drop = FALSE]
   na_rows[[time_col]] <- d[[time_col]][big] + gaps[big] / 2
-  for (cc in cols) na_rows[[cc]] <- NA_real_
-  if ("imputed" %in% names(na_rows)) na_rows$imputed <- FALSE
+  for (cc in cols) {
+    na_rows[[cc]] <- NA_real_
+  }
   d <- rbind(d, na_rows)
   d[order(d[[time_col]]), ]
 }
 
 
-kaudulla_elephants_clean_imputed <- read_csv(DATA_PATH)
+kaudulla_elephants_clean_imputed <- read_csv(here(
+  "data/kaudulla_elephants_clean_imputed.csv"
+))
 
 df_sf <- kaudulla_elephants_clean_imputed |>
   filter(!is.na(lon), !is.na(lat)) |>
@@ -117,10 +123,26 @@ df_sf <- kaudulla_elephants_clean_imputed |>
 # IMPORTANT: palette MUST be based on FULL dataset (not filtered)
 pal <- colorFactor(
   palette = c(
-    "#8B0000", "#006400", "#00008B", "#8B4513", "#4B0082",
-    "#2F4F4F", "#800080", "#B22222", "#556B2F", "#191970",
-    "#8B008B", "#A52A2A", "#483D8B", "#008080", "#5F9EA0",
-    "#7B3F00", "#3B3D6B", "#4A7023", "#6A0DAD", "#7F1734"
+    "#8B0000",
+    "#006400",
+    "#00008B",
+    "#8B4513",
+    "#4B0082",
+    "#2F4F4F",
+    "#800080",
+    "#B22222",
+    "#556B2F",
+    "#191970",
+    "#8B008B",
+    "#A52A2A",
+    "#483D8B",
+    "#008080",
+    "#5F9EA0",
+    "#7B3F00",
+    "#3B3D6B",
+    "#4A7023",
+    "#6A0DAD",
+    "#7F1734"
   ),
   domain = df_sf$year_month
 )
@@ -129,26 +151,40 @@ elephants <- sort(unique(df_sf$name))
 
 # Colors for elephant tracking
 elephant_colors <- c(
-  "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-  "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
-  "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000"
+  "#e6194b",
+  "#3cb44b",
+  "#ffe119",
+  "#4363d8",
+  "#f58231",
+  "#911eb4",
+  "#46f0f0",
+  "#f032e6",
+  "#bcf60c",
+  "#fabebe",
+  "#008080",
+  "#e6beff",
+  "#9a6324",
+  "#fffac8",
+  "#800000"
 )
 
 
-# ==============================================================
+#==============================================================
 # 2. CALENDAR HEATMAP FUNCTION
-# ==============================================================
+#==============================================================
 
-calendarHeat <- function(dates,
-                         values,
-                         colors,
-                         at = NULL,
-                         ncolors = 99,
-                         title,
-                         date.form = "%Y-%m-%d",
-                         colorkey = FALSE,
-                         legend = NULL,
-                         ...) {
+calendarHeat <- function(
+  dates,
+  values,
+  colors,
+  at = NULL,
+  ncolors = 99,
+  title,
+  date.form = "%Y-%m-%d",
+  colorkey = FALSE,
+  legend = NULL,
+  ...
+) {
   require(lattice, quietly = TRUE)
   require(grid, quietly = TRUE)
 
@@ -189,7 +225,9 @@ calendarHeat <- function(dates,
     }
     my.cuts <- NULL
   } else {
-    if (missing(colors)) colors <- c("#D61818", "#FFAE63", "#FFFFBD", "#B5E384")
+    if (missing(colors)) {
+      colors <- c("#D61818", "#FFAE63", "#FFFFBD", "#B5E384")
+    }
     calendar.pal <- colorRampPalette(colors, space = "Lab")(ncolors)
     my.cuts <- ncolors - 1
   }
@@ -206,49 +244,55 @@ calendarHeat <- function(dates,
   lattice.options(default.theme = cal.theme)
   yrs <- (unique(caldat$yr))
   nyr <- length(yrs)
-
-
-  # ==============================================================
+  #==============================================================
   # PART 2: PLOT RENDERING & POST-GRAPHICS REGION FOCUS
-  # ==============================================================
-  print(cal.plot <- levelplot(value ~ woty * dotw | yr,
-    data = caldat,
-    as.table = TRUE,
-    aspect = .12,
-    layout = c(1, nyr %% 7),
-    between = list(x = 0, y = c(0.5, 0.5)),
-    strip = TRUE,
-    main = ifelse(missing(title), "", title),
-    scales = list(
-      x = list(
-        at = c(seq(2.9, 52, by = 4.42)),
-        labels = month.abb,
-        alternating = c(1, rep(0, (nyr - 1))),
-        tck = 0,
-        cex = 0.7
-      ),
-      y = list(
-        at = c(0, 1, 2, 3, 4, 5, 6),
-        labels = c(
-          "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
-          "Friday", "Saturday"
+  #==============================================================
+  print(
+    cal.plot <- levelplot(
+      value ~ woty * dotw | yr,
+      data = caldat,
+      as.table = TRUE,
+      aspect = .12,
+      layout = c(1, nyr %% 7),
+      between = list(x = 0, y = c(0.5, 0.5)),
+      strip = TRUE,
+      main = ifelse(missing(title), "", title),
+      scales = list(
+        x = list(
+          at = c(seq(2.9, 52, by = 4.42)),
+          labels = month.abb,
+          alternating = c(1, rep(0, (nyr - 1))),
+          tck = 0,
+          cex = 0.7
         ),
-        alternating = 1,
-        cex = 0.6,
-        tck = 0
-      )
-    ),
-    xlim = c(0.4, 54.6),
-    ylim = c(6.6, -0.6),
-    at = at,
-    cuts = my.cuts,
-    col.regions = calendar.pal,
-    xlab = "",
-    ylab = "",
-    colorkey = colorkey,
-    legend = legend,
-    subscripts = TRUE
-  ))
+        y = list(
+          at = c(0, 1, 2, 3, 4, 5, 6),
+          labels = c(
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday"
+          ),
+          alternating = 1,
+          cex = 0.6,
+          tck = 0
+        )
+      ),
+      xlim = c(0.4, 54.6),
+      ylim = c(6.6, -0.6),
+      at = at,
+      cuts = my.cuts,
+      col.regions = calendar.pal,
+      xlab = "",
+      ylab = "",
+      colorkey = colorkey,
+      legend = legend,
+      subscripts = TRUE
+    )
+  )
 
   panel.locs <- trellis.currentLayout()
   for (row in 1:nrow(panel.locs)) {
@@ -274,56 +318,171 @@ calendarHeat <- function(dates,
           } else {
             x.finis <- dates.fsubs$woty[nrow(dates.fsubs)] + 0.5
           }
-          grid.lines(x = c(x.start, x.finis), y = c(k - 0.5, k - 0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
+          grid.lines(
+            x = c(x.start, x.finis),
+            y = c(k - 0.5, k - 0.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
         }
         if (adj.start < 2) {
-          grid.lines(x = c(0.5, 0.5), y = c(6.5, y.start - 0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
-          grid.lines(x = c(1.5, 1.5), y = c(6.5, -0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
-          grid.lines(x = c(x.finis, x.finis), y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
+          grid.lines(
+            x = c(0.5, 0.5),
+            y = c(6.5, y.start - 0.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
+          grid.lines(
+            x = c(1.5, 1.5),
+            y = c(6.5, -0.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
+          grid.lines(
+            x = c(x.finis, x.finis),
+            y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
           if (dates.fsubs$dotw[dates.len] != 6) {
-            grid.lines(x = c(x.finis + 1, x.finis + 1), y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
+            grid.lines(
+              x = c(x.finis + 1, x.finis + 1),
+              y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5),
+              default.units = "native",
+              gp = gpar(col = "grey", lwd = 1)
+            )
           }
-          grid.lines(x = c(x.finis, x.finis), y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
+          grid.lines(
+            x = c(x.finis, x.finis),
+            y = c(dates.fsubs$dotw[dates.len] - 0.5, -0.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
         }
         for (n in 1:51) {
-          grid.lines(x = c(n + 1.5, n + 1.5), y = c(-0.5, 6.5), default.units = "native", gp = gpar(col = "grey", lwd = 1))
+          grid.lines(
+            x = c(n + 1.5, n + 1.5),
+            y = c(-0.5, 6.5),
+            default.units = "native",
+            gp = gpar(col = "grey", lwd = 1)
+          )
         }
         x.start <- adj.start - 0.5
 
         if (y.start > 0) {
-          grid.lines(x = c(x.start, x.start + 1), y = c(y.start - 0.5, y.start - 0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-          grid.lines(x = c(x.start + 1, x.start + 1), y = c(y.start - 0.5, -0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-          grid.lines(x = c(x.start, x.start), y = c(y.start - 0.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+          grid.lines(
+            x = c(x.start, x.start + 1),
+            y = c(y.start - 0.5, y.start - 0.5),
+            default.units = "native",
+            gp = gpar(col = "black", lwd = 1.75)
+          )
+          grid.lines(
+            x = c(x.start + 1, x.start + 1),
+            y = c(y.start - 0.5, -0.5),
+            default.units = "native",
+            gp = gpar(col = "black", lwd = 1.75)
+          )
+          grid.lines(
+            x = c(x.start, x.start),
+            y = c(y.start - 0.5, 6.5),
+            default.units = "native",
+            gp = gpar(col = "black", lwd = 1.75)
+          )
           if (y.end < 6) {
-            grid.lines(x = c(x.start + 1, x.finis + 1), y = c(-0.5, -0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-            grid.lines(x = c(x.start, x.finis), y = c(6.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.start + 1, x.finis + 1),
+              y = c(-0.5, -0.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
+            grid.lines(
+              x = c(x.start, x.finis),
+              y = c(6.5, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           } else {
-            grid.lines(x = c(x.start + 1, x.finis), y = c(-0.5, -0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-            grid.lines(x = c(x.start, x.finis), y = c(6.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.start + 1, x.finis),
+              y = c(-0.5, -0.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
+            grid.lines(
+              x = c(x.start, x.finis),
+              y = c(6.5, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           }
         } else {
-          grid.lines(x = c(x.start, x.start), y = c(-0.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+          grid.lines(
+            x = c(x.start, x.start),
+            y = c(-0.5, 6.5),
+            default.units = "native",
+            gp = gpar(col = "black", lwd = 1.75)
+          )
         }
 
         if (y.start == 0) {
           if (y.end < 6) {
-            grid.lines(x = c(x.start, x.finis + 1), y = c(-0.5, -0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-            grid.lines(x = c(x.start, x.finis), y = c(6.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.start, x.finis + 1),
+              y = c(-0.5, -0.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
+            grid.lines(
+              x = c(x.start, x.finis),
+              y = c(6.5, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           } else {
-            grid.lines(x = c(x.start + 1, x.finis), y = c(-0.5, -0.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-            grid.lines(x = c(x.start, x.finis), y = c(6.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.start + 1, x.finis),
+              y = c(-0.5, -0.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
+            grid.lines(
+              x = c(x.start, x.finis),
+              y = c(6.5, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           }
         }
         for (j in 1:12) {
           last.month <- max(dates.fsubs$seq[dates.fsubs$month == j])
           x.last.m <- dates.fsubs$woty[last.month] + 0.5
           y.last.m <- dates.fsubs$dotw[last.month] + 0.5
-          grid.lines(x = c(x.last.m, x.last.m), y = c(-0.5, y.last.m), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+          grid.lines(
+            x = c(x.last.m, x.last.m),
+            y = c(-0.5, y.last.m),
+            default.units = "native",
+            gp = gpar(col = "black", lwd = 1.75)
+          )
           if ((y.last.m) < 6) {
-            grid.lines(x = c(x.last.m, x.last.m - 1), y = c(y.last.m, y.last.m), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
-            grid.lines(x = c(x.last.m - 1, x.last.m - 1), y = c(y.last.m, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.last.m, x.last.m - 1),
+              y = c(y.last.m, y.last.m),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
+            grid.lines(
+              x = c(x.last.m - 1, x.last.m - 1),
+              y = c(y.last.m, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           } else {
-            grid.lines(x = c(x.last.m, x.last.m), y = c(-0.5, 6.5), default.units = "native", gp = gpar(col = "black", lwd = 1.75))
+            grid.lines(
+              x = c(x.last.m, x.last.m),
+              y = c(-0.5, 6.5),
+              default.units = "native",
+              gp = gpar(col = "black", lwd = 1.75)
+            )
           }
         }
       }
@@ -336,7 +495,7 @@ calendarHeat <- function(dates,
 # ==============================================================================
 # 3. GLOBAL SETTINGS & DATA INGESTION
 # ==============================================================================
-elephants <- read.csv(DATA_PATH)
+elephants <- read.csv(here("data/kaudulla_elephants_clean_imputed.csv"))
 elephants$datetime <- ymd_hms(elephants$datetime)
 elephants$date <- as.Date(elephants$datetime)
 
@@ -355,19 +514,22 @@ discrete_key <- list(
 )
 
 
-# ==============================================================
+#==============================================================
 # 4. CLIMATE DATA
-# ==============================================================
+#==============================================================
 
-CLIMATE_DATA <- here("data/daily_climate.xlsx")
-
-climate <- read_excel(CLIMATE_DATA)
+climate <- read_excel(here("data/daily_climate.xlsx"))
 climate$date <- as.Date(climate$date, origin = "1899-12-30")
 dates <- climate$date
 
 my_colors <- c(
-  "#FFFF99", "#FFCC66", "#F5B27A", "#FF6F91",
-  "#9966CC", "#330066", "#000000"
+  "#FFFF99",
+  "#FFCC66",
+  "#F5B27A",
+  "#FF6F91",
+  "#9966CC",
+  "#330066",
+  "#000000"
 )
 
 plot_info <- list(
@@ -386,19 +548,43 @@ plot_info <- list(
   "Pressure" = list(
     values = climate$pressure,
     breaks = c(0, 100.8, 101.0, 101.1, 101.2, 101.3, 101.4, 101.5),
-    labels = c("0-100.8", "100.8-101", "101-101.1", "101.1-101.2", "101.2-101.3", "101.3-101.4", "101.4-101.5"),
+    labels = c(
+      "0-100.8",
+      "100.8-101",
+      "101-101.1",
+      "101.1-101.2",
+      "101.2-101.3",
+      "101.3-101.4",
+      "101.4-101.5"
+    ),
     title = "Daily Pressure Calendar Heatmap"
   ),
   "Maximum Temperature" = list(
     values = climate$temp_max,
     breaks = c(0, 26.7, 27.4, 28.1, 28.8, 29.5, 30.2, 31),
-    labels = c("0-26.7", "26.7-27.4", "27.4-28.1", "28.1-28.8", "28.8-29.5", "29.5-30.2", "30.2-31"),
+    labels = c(
+      "0-26.7",
+      "26.7-27.4",
+      "27.4-28.1",
+      "28.1-28.8",
+      "28.8-29.5",
+      "29.5-30.2",
+      "30.2-31"
+    ),
     title = "Daily Maximum Temperature Calendar Heatmap"
   ),
   "Earth Skin Temperature" = list(
     values = climate$temp_skin,
     breaks = c(0, 27.2, 27.9, 28.6, 29.3, 30, 30.7, 31.5),
-    labels = c("0-27.2", "27.2-27.9", "27.9-28.6", "28.6-29.3", "29.3-30", "30-30.7", "30.7-31.5"),
+    labels = c(
+      "0-27.2",
+      "27.2-27.9",
+      "27.9-28.6",
+      "28.6-29.3",
+      "29.3-30",
+      "30-30.7",
+      "30.7-31.5"
+    ),
     title = "Daily Earth Skin Temperature Calendar Heatmap"
   ),
   "Wind Speed" = list(
@@ -414,3 +600,22 @@ plot_info <- list(
     title = "Daily Maximum Wind Speed Calendar Heatmap"
   )
 )
+
+
+library(shiny)
+library(bslib)
+library(leaflet)
+library(dplyr)
+library(plotly)
+library(DT)
+library(scales)
+library(lubridate)
+library(bsicons)
+
+# ---- Source module files ----
+source("R/helpers.R")
+source("R/data_prep.R")
+source("R/mod_elephant_tracking.R")
+
+# ---- Load data once at app startup ----
+elephant_data <- load_elephant_data(DATA_PATH)

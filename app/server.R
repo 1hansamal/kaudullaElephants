@@ -1,25 +1,3 @@
-library(shiny)
-library(shinydashboard)
-library(plotly)
-library(dplyr)
-library(DT)
-library(dplyr)
-library(sf)
-library(readr)
-library(plotly)
-library(adehabitatHR)
-library(leaflet)
-library(htmltools)
-library(yyjsonr)
-library(shiny)
-library(readxl)
-library(lattice)
-library(grid)
-library(ggplot2)
-library(lubridate)
-
-
-
 # ── Server ─────────────────────────────────────────────────────────────────────
 server <- function(input, output, session) {
   all_names <- sort(unique(elephants_df$name))
@@ -27,28 +5,45 @@ server <- function(input, output, session) {
   male_names <- sort(unique(elephants_df$name[elephants_df$sex == "Male"]))
 
   # ── Quick-select buttons ─────────────────────────────────────────────────────
-  observeEvent(input$btn_all, updateSelectInput(session, "sel_elephants", selected = all_names))
-  observeEvent(input$btn_female, updateSelectInput(session, "sel_elephants", selected = female_names))
-  observeEvent(input$btn_male, updateSelectInput(session, "sel_elephants", selected = male_names))
-  observeEvent(input$btn_clear, updateSelectInput(session, "sel_elephants", selected = character(0)))
+  observeEvent(
+    input$btn_all,
+    updateSelectInput(session, "sel_elephants", selected = all_names)
+  )
+  observeEvent(
+    input$btn_female,
+    updateSelectInput(session, "sel_elephants", selected = female_names)
+  )
+  observeEvent(
+    input$btn_male,
+    updateSelectInput(session, "sel_elephants", selected = male_names)
+  )
+  observeEvent(
+    input$btn_clear,
+    updateSelectInput(session, "sel_elephants", selected = character(0))
+  )
+
+  mod_elephant_tracking_Server(
+    "kaudulla",
+    tracking_clean = elephant_data$tracking_clean,
+    unique_elephants = elephant_data$unique_elephants,
+    unique_sexes = elephant_data$unique_sexes,
+    elephant_colors = elephant_data$elephant_colors,
+    min_date = elephant_data$min_date,
+    max_date = elephant_data$max_date
+  )
 
   # ── Reactive filtered dataset ────────────────────────────────────────────────
   filtered <- reactive({
     req(input$date_range)
 
     df <- elephants_df %>%
-      filter(
-        date_parsed >= input$date_range[1],
-        date_parsed <= input$date_range[2]
-      )
+      filter(date_parsed >= input$date_range[1], date_parsed <= input$date_range[2])
 
     if (length(input$sel_elephants) > 0) {
       df <- df %>% filter(name %in% input$sel_elephants)
     } else {
       df <- df[0, ]
     }
-
-    if (!input$show_imputed) df <- df %>% filter(!imputed)
 
     df
   })
@@ -74,7 +69,6 @@ server <- function(input, output, session) {
       summarise(
         lat = mean(lat, na.rm = TRUE),
         lon = mean(lon, na.rm = TRUE),
-        imputed = any(imputed),
         .groups = "drop"
       ) %>%
       rename(datetime_sl = period)
@@ -83,25 +77,37 @@ server <- function(input, output, session) {
   # ── Value boxes ──────────────────────────────────────────────────────────────
   output$vbox_obs <- renderValueBox({
     n <- nrow(filtered())
-    valueBox(format(n, big.mark = ","), "GPS Fixes (filtered)",
-      icon = icon("location-dot"), color = "green"
+    valueBox(
+      format(n, big.mark = ","),
+      "GPS Fixes (filtered)",
+      icon = icon("location-dot"),
+      color = "green"
     )
   })
   output$vbox_eleph <- renderValueBox({
-    valueBox(length(unique(filtered()$name)), "Elephants Selected",
-      icon = icon("paw"), color = "olive"
+    valueBox(
+      length(unique(filtered()$name)),
+      "Elephants Selected",
+      icon = icon("paw"),
+      color = "olive"
     )
   })
   output$vbox_start <- renderValueBox({
     d <- suppressWarnings(min(filtered()$date_parsed, na.rm = TRUE))
-    valueBox(if (is.finite(d)) format(d, "%d %b %Y") else "\u2014", "Data From",
-      icon = icon("calendar-day"), color = "teal"
+    valueBox(
+      if (is.finite(d)) format(d, "%d %b %Y") else "\u2014",
+      "Data From",
+      icon = icon("calendar-day"),
+      color = "teal"
     )
   })
   output$vbox_end <- renderValueBox({
     d <- suppressWarnings(max(filtered()$date_parsed, na.rm = TRUE))
-    valueBox(if (is.finite(d)) format(d, "%d %b %Y") else "\u2014", "Data To",
-      icon = icon("calendar-check"), color = "teal"
+    valueBox(
+      if (is.finite(d)) format(d, "%d %b %Y") else "\u2014",
+      "Data To",
+      icon = icon("calendar-check"),
+      color = "teal"
     )
   })
 
@@ -113,37 +119,43 @@ server <- function(input, output, session) {
     p <- plot_ly()
 
     for (el in elephants_in_data) {
-      sub <- df %>%
-        filter(name == el) %>%
-        arrange(datetime_sl)
+      sub <- df %>% filter(name == el) %>% arrange(datetime_sl)
       sub <- insert_gaps(sub) # FIX 2: break lines at gaps
       clr <- if (el %in% names(col_map)) col_map[[el]] else "#aaaaaa"
 
-      p <- p %>% add_trace(
-        data = sub,
-        x = ~datetime_sl,
-        y = as.formula(paste0("~", y_col)),
-        type = "scatter",
-        mode = "lines+markers",
-        name = el,
-        connectgaps = FALSE, # FIX 2: do NOT join across gaps
-        line = list(color = clr, width = 1.5),
-        marker = list(
-          color   = ~ ifelse(imputed, "#888888", clr),
-          size    = ~ ifelse(imputed, 5, 4),
-          opacity = 0.85,
-          symbol  = ~ ifelse(imputed, "circle-open", "circle"),
-          line    = list(color = clr, width = 1)
-        ),
-        text = ~ paste0(
-          "<b>", name, "</b><br>",
-          "Time (SL): ", format(datetime_sl, "%d %b %Y %H:%M"), "<br>",
-          y_title, ": ", round(get(y_col), 5), "\u00B0<br>",
-          "Sex: ", sex, "<br>",
-          "Imputed: ", imputed
-        ),
-        hoverinfo = "text"
-      )
+      p <- p %>%
+        add_trace(
+          data = sub,
+          x = ~datetime_sl,
+          y = as.formula(paste0("~", y_col)),
+          type = "scatter",
+          mode = "lines+markers",
+          name = el,
+          connectgaps = FALSE, # FIX 2: do NOT join across gaps
+          line = list(color = clr, width = 1.5),
+          marker = list(
+            color = clr,
+            size = 4,
+            opacity = 0.85,
+            symbol = "circle",
+            line = list(color = clr, width = 1)
+          ),
+          text = ~ paste0(
+            "<b>",
+            name,
+            "</b><br>",
+            "Time (SL): ",
+            format(datetime_sl, "%d %b %Y %H:%M"),
+            "<br>",
+            y_title,
+            ": ",
+            round(get(y_col), 5),
+            "\u00B0<br>",
+            "Sex: ",
+            sex
+          ),
+          hoverinfo = "text"
+        )
 
       if (input$add_smooth && nrow(sub) > 10) {
         smooth_df <- data.frame(x = as.numeric(sub$datetime_sl), y = sub[[y_col]])
@@ -151,46 +163,64 @@ server <- function(input, output, session) {
         if (nrow(smooth_df) > 5) {
           lo <- loess(y ~ x, data = smooth_df, span = 0.3)
           smooth_df$yhat <- predict(lo)
-          smooth_df$ts <- as.POSIXct(smooth_df$x, origin = "1970-01-01", tz = "Asia/Colombo")
-          p <- p %>% add_trace(
-            data = smooth_df, x = ~ts, y = ~yhat,
-            type = "scatter", mode = "lines",
-            name = paste(el, "(smooth)"),
-            line = list(color = clr, width = 2.5, dash = "dot"),
-            showlegend = FALSE, hoverinfo = "skip"
+          smooth_df$ts <- as.POSIXct(
+            smooth_df$x,
+            origin = "1970-01-01",
+            tz = "Asia/Colombo"
           )
+          p <- p %>%
+            add_trace(
+              data = smooth_df,
+              x = ~ts,
+              y = ~yhat,
+              type = "scatter",
+              mode = "lines",
+              name = paste(el, "(smooth)"),
+              line = list(color = clr, width = 2.5, dash = "dot"),
+              showlegend = FALSE,
+              hoverinfo = "skip"
+            )
         }
       }
     }
 
     if (!is.null(ref_lines)) {
       for (rl in ref_lines) {
-        p <- p %>% add_segments(
-          x = min(df$datetime_sl, na.rm = TRUE),
-          xend = max(df$datetime_sl, na.rm = TRUE),
-          y = rl$val, yend = rl$val,
-          line = list(color = rl$color, width = 1.5, dash = "dash"),
-          name = rl$label, showlegend = TRUE, hoverinfo = "name"
-        )
+        p <- p %>%
+          add_segments(
+            x = min(df$datetime_sl, na.rm = TRUE),
+            xend = max(df$datetime_sl, na.rm = TRUE),
+            y = rl$val,
+            yend = rl$val,
+            line = list(color = rl$color, width = 1.5, dash = "dash"),
+            name = rl$label,
+            showlegend = TRUE,
+            hoverinfo = "name"
+          )
       }
     }
 
-    p %>% layout(
-      paper_bgcolor = "#ffffff",
-      plot_bgcolor = "#ffffff",
-      font = list(color = "#333333", family = "Segoe UI"),
-      xaxis = list(
-        title = "Date / Time (Asia/Colombo)", gridcolor = "#e5e5e5",
-        zerolinecolor = "#dddddd", tickformat = "%b %Y"
-      ),
-      yaxis = list(title = y_title, gridcolor = "#e5e5e5", zerolinecolor = "#dddddd"),
-      legend = list(
-        bgcolor = "#ffffff", bordercolor = "#4caf50",
-        borderwidth = 1, font = list(size = 11)
-      ),
-      hoverlabel = list(bgcolor = "#ffffff", font = list(color = "#333333")),
-      margin = list(t = 40, b = 60, l = 70, r = 20)
-    )
+    p %>%
+      layout(
+        paper_bgcolor = "#ffffff",
+        plot_bgcolor = "#ffffff",
+        font = list(color = "#333333", family = "Segoe UI"),
+        xaxis = list(
+          title = "Date / Time (Asia/Colombo)",
+          gridcolor = "#e5e5e5",
+          zerolinecolor = "#dddddd",
+          tickformat = "%b %Y"
+        ),
+        yaxis = list(title = y_title, gridcolor = "#e5e5e5", zerolinecolor = "#dddddd"),
+        legend = list(
+          bgcolor = "#ffffff",
+          bordercolor = "#4caf50",
+          borderwidth = 1,
+          font = list(size = 11)
+        ),
+        hoverlabel = list(bgcolor = "#ffffff", font = list(color = "#333333")),
+        margin = list(t = 40, b = 60, l = 70, r = 20)
+      )
   }
 
   # ── Helper: dual-axis plot — latitude & longitude overlaid ──────────────────
@@ -201,53 +231,73 @@ server <- function(input, output, session) {
     p <- plot_ly()
 
     for (el in elephants_in_data) {
-      sub <- df %>%
-        filter(name == el) %>%
-        arrange(datetime_sl)
+      sub <- df %>% filter(name == el) %>% arrange(datetime_sl)
       sub <- insert_gaps(sub) # FIX 2: break lines at gaps
       clr <- if (el %in% names(col_map)) col_map[[el]] else "#aaaaaa"
 
       # Latitude (left axis, solid, circles)
-      p <- p %>% add_trace(
-        data = sub, x = ~datetime_sl, y = ~lat,
-        type = "scatter", mode = "lines+markers",
-        name = paste(el, "\u2013 Lat"), legendgroup = el, yaxis = "y",
-        connectgaps = FALSE,
-        line = list(color = clr, width = 1.5, dash = "solid"),
-        marker = list(
-          color = ~ ifelse(imputed, "#888888", clr),
-          size = ~ ifelse(imputed, 5, 4),
-          symbol = ~ ifelse(imputed, "circle-open", "circle"),
-          line = list(color = clr, width = 1)
-        ),
-        text = ~ paste0(
-          "<b>", name, "</b><br>Latitude: ", round(lat, 5), "\u00B0N<br>",
-          format(datetime_sl, "%d %b %Y %H:%M"), "<br>Sex: ", sex,
-          "<br>Imputed: ", imputed
-        ),
-        hoverinfo = "text"
-      )
+      p <- p %>%
+        add_trace(
+          data = sub,
+          x = ~datetime_sl,
+          y = ~lat,
+          type = "scatter",
+          mode = "lines+markers",
+          name = paste(el, "\u2013 Lat"),
+          legendgroup = el,
+          yaxis = "y",
+          connectgaps = FALSE,
+          line = list(color = clr, width = 1.5, dash = "solid"),
+          marker = list(
+            color = clr,
+            size = 4,
+            symbol = "circle",
+            line = list(color = clr, width = 1)
+          ),
+          text = ~ paste0(
+            "<b>",
+            name,
+            "</b><br>Latitude: ",
+            round(lat, 5),
+            "\u00B0N<br>",
+            format(datetime_sl, "%d %b %Y %H:%M"),
+            "<br>Sex: ",
+            sex
+          ),
+          hoverinfo = "text"
+        )
 
       # Longitude (right axis, dotted, triangles)
-      p <- p %>% add_trace(
-        data = sub, x = ~datetime_sl, y = ~lon,
-        type = "scatter", mode = "lines+markers",
-        name = paste(el, "\u2013 Lon"), legendgroup = el, yaxis = "y2",
-        connectgaps = FALSE,
-        line = list(color = clr, width = 1.5, dash = "dot"),
-        marker = list(
-          color = ~ ifelse(imputed, "#888888", clr),
-          size = ~ ifelse(imputed, 5, 4),
-          symbol = ~ ifelse(imputed, "triangle-up-open", "triangle-up"),
-          line = list(color = clr, width = 1)
-        ),
-        text = ~ paste0(
-          "<b>", name, "</b><br>Longitude: ", round(lon, 5), "\u00B0E<br>",
-          format(datetime_sl, "%d %b %Y %H:%M"), "<br>Sex: ", sex,
-          "<br>Imputed: ", imputed
-        ),
-        hoverinfo = "text"
-      )
+      p <- p %>%
+        add_trace(
+          data = sub,
+          x = ~datetime_sl,
+          y = ~lon,
+          type = "scatter",
+          mode = "lines+markers",
+          name = paste(el, "\u2013 Lon"),
+          legendgroup = el,
+          yaxis = "y2",
+          connectgaps = FALSE,
+          line = list(color = clr, width = 1.5, dash = "dot"),
+          marker = list(
+            color = clr,
+            size = 4,
+            symbol = "triangle-up",
+            line = list(color = clr, width = 1)
+          ),
+          text = ~ paste0(
+            "<b>",
+            name,
+            "</b><br>Longitude: ",
+            round(lon, 5),
+            "\u00B0E<br>",
+            format(datetime_sl, "%d %b %Y %H:%M"),
+            "<br>Sex: ",
+            sex
+          ),
+          hoverinfo = "text"
+        )
 
       if (input$add_smooth && nrow(sub) > 10) {
         sm_lat <- data.frame(x = as.numeric(sub$datetime_sl), y = sub$lat)
@@ -256,13 +306,21 @@ server <- function(input, output, session) {
           lo <- loess(y ~ x, data = sm_lat, span = 0.3)
           sm_lat$yhat <- predict(lo)
           sm_lat$ts <- as.POSIXct(sm_lat$x, origin = "1970-01-01", tz = "Asia/Colombo")
-          p <- p %>% add_trace(
-            data = sm_lat, x = ~ts, y = ~yhat,
-            type = "scatter", mode = "lines",
-            name = paste(el, "Lat smooth"), legendgroup = el, yaxis = "y",
-            line = list(color = clr, width = 2.5, dash = "solid"),
-            opacity = 0.4, showlegend = FALSE, hoverinfo = "skip"
-          )
+          p <- p %>%
+            add_trace(
+              data = sm_lat,
+              x = ~ts,
+              y = ~yhat,
+              type = "scatter",
+              mode = "lines",
+              name = paste(el, "Lat smooth"),
+              legendgroup = el,
+              yaxis = "y",
+              line = list(color = clr, width = 2.5, dash = "solid"),
+              opacity = 0.4,
+              showlegend = FALSE,
+              hoverinfo = "skip"
+            )
         }
         sm_lon <- data.frame(x = as.numeric(sub$datetime_sl), y = sub$lon)
         sm_lon <- sm_lon[!is.na(sm_lon$y), ]
@@ -270,13 +328,21 @@ server <- function(input, output, session) {
           lo2 <- loess(y ~ x, data = sm_lon, span = 0.3)
           sm_lon$yhat <- predict(lo2)
           sm_lon$ts <- as.POSIXct(sm_lon$x, origin = "1970-01-01", tz = "Asia/Colombo")
-          p <- p %>% add_trace(
-            data = sm_lon, x = ~ts, y = ~yhat,
-            type = "scatter", mode = "lines",
-            name = paste(el, "Lon smooth"), legendgroup = el, yaxis = "y2",
-            line = list(color = clr, width = 2.5, dash = "dashdot"),
-            opacity = 0.4, showlegend = FALSE, hoverinfo = "skip"
-          )
+          p <- p %>%
+            add_trace(
+              data = sm_lon,
+              x = ~ts,
+              y = ~yhat,
+              type = "scatter",
+              mode = "lines",
+              name = paste(el, "Lon smooth"),
+              legendgroup = el,
+              yaxis = "y2",
+              line = list(color = clr, width = 2.5, dash = "dashdot"),
+              opacity = 0.4,
+              showlegend = FALSE,
+              hoverinfo = "skip"
+            )
         }
       }
     }
@@ -295,45 +361,70 @@ server <- function(input, output, session) {
     x_max <- max(df$datetime_sl, na.rm = TRUE)
 
     for (rl in ref_lat) {
-      p <- p %>% add_segments(
-        x = x_min, xend = x_max, y = rl$val, yend = rl$val, yaxis = "y",
-        line = list(color = rl$color, width = 1, dash = "dash"),
-        name = rl$label, showlegend = TRUE, hoverinfo = "name"
-      )
+      p <- p %>%
+        add_segments(
+          x = x_min,
+          xend = x_max,
+          y = rl$val,
+          yend = rl$val,
+          yaxis = "y",
+          line = list(color = rl$color, width = 1, dash = "dash"),
+          name = rl$label,
+          showlegend = TRUE,
+          hoverinfo = "name"
+        )
     }
     for (rl in ref_lon) {
-      p <- p %>% add_segments(
-        x = x_min, xend = x_max, y = rl$val, yend = rl$val, yaxis = "y2",
-        line = list(color = rl$color, width = 1, dash = "dashdot"),
-        name = rl$label, showlegend = TRUE, hoverinfo = "name"
-      )
+      p <- p %>%
+        add_segments(
+          x = x_min,
+          xend = x_max,
+          y = rl$val,
+          yend = rl$val,
+          yaxis = "y2",
+          line = list(color = rl$color, width = 1, dash = "dashdot"),
+          name = rl$label,
+          showlegend = TRUE,
+          hoverinfo = "name"
+        )
     }
 
-    p %>% layout(
-      paper_bgcolor = "#ffffff",
-      plot_bgcolor = "#ffffff",
-      font = list(color = "#333333", family = "Segoe UI"),
-      xaxis = list(
-        title = "Date / Time (Asia/Colombo)", gridcolor = "#e5e5e5",
-        zerolinecolor = "#dddddd", tickformat = "%b %Y", domain = c(0, 1)
-      ),
-      yaxis = list(
-        title = "Latitude (\u00B0N, WGS84)", gridcolor = "#e5e5e5",
-        zerolinecolor = "#dddddd",
-        titlefont = list(color = "#0277bd"), tickfont = list(color = "#0277bd")
-      ),
-      yaxis2 = list(
-        title = "Longitude (\u00B0E, WGS84)", overlaying = "y", side = "right",
-        showgrid = FALSE,
-        titlefont = list(color = "#ef6c00"), tickfont = list(color = "#ef6c00")
-      ),
-      legend = list(
-        bgcolor = "#ffffff", bordercolor = "#4caf50",
-        borderwidth = 1, font = list(size = 10)
-      ),
-      hoverlabel = list(bgcolor = "#ffffff", font = list(color = "#333333")),
-      margin = list(t = 40, b = 60, l = 70, r = 70)
-    )
+    p %>%
+      layout(
+        paper_bgcolor = "#ffffff",
+        plot_bgcolor = "#ffffff",
+        font = list(color = "#333333", family = "Segoe UI"),
+        xaxis = list(
+          title = "Date / Time (Asia/Colombo)",
+          gridcolor = "#e5e5e5",
+          zerolinecolor = "#dddddd",
+          tickformat = "%b %Y",
+          domain = c(0, 1)
+        ),
+        yaxis = list(
+          title = "Latitude (\u00B0N, WGS84)",
+          gridcolor = "#e5e5e5",
+          zerolinecolor = "#dddddd",
+          titlefont = list(color = "#0277bd"),
+          tickfont = list(color = "#0277bd")
+        ),
+        yaxis2 = list(
+          title = "Longitude (\u00B0E, WGS84)",
+          overlaying = "y",
+          side = "right",
+          showgrid = FALSE,
+          titlefont = list(color = "#ef6c00"),
+          tickfont = list(color = "#ef6c00")
+        ),
+        legend = list(
+          bgcolor = "#ffffff",
+          bordercolor = "#4caf50",
+          borderwidth = 1,
+          font = list(size = 10)
+        ),
+        hoverlabel = list(bgcolor = "#ffffff", font = list(color = "#333333")),
+        margin = list(t = 40, b = 60, l = 70, r = 70)
+      )
   }
 
   # ── Latitude plot ────────────────────────────────────────────────────────────
@@ -367,6 +458,166 @@ server <- function(input, output, session) {
     make_dual_axis_plot(df)
   })
 
+  # ── Small static reference map: Kaudulla Tank & park boundary ──────────────
+  # This is the same geographic anchor (tank + N/S/E/W boundary lines) used
+  # for every dashed reference line on the Latitude, Longitude, and
+  # Both-Coordinates charts above — shown here as an actual map for context.
+  output$kaudulla_ref_map <- renderLeaflet({
+    # Approximate park boundary (rectangle) — matches the reference lines
+    # used in make_plot()/make_dual_axis_plot(): lat 8.080-8.220, lon 80.872-80.950
+    park_boundary <- data.frame(
+      lon = c(80.872, 80.950, 80.950, 80.872, 80.872),
+      lat = c(8.080, 8.080, 8.220, 8.220, 8.080)
+    )
+
+    # Points #1-3 — same three rows at the top of the Key Coordinates table
+    ref_points <- data.frame(
+      num = c("1", "2", "3"),
+      name = c(
+        "Kaudulla Tank (core reference)",
+        "Park entrance / safari zone",
+        "Kaudulla Wewa (mapped reservoir)"
+      ),
+      lat = c(8.140, 8.111, 8.168),
+      lon = c(80.895, 80.886, 80.926),
+      note = c(
+        "Dry-season water source \u2014 latitude/longitude reference lines pivot around this point.",
+        "Southwestern edge of the elephants' core range; jeep safari staging area.",
+        "Northeastern shoreline of the reservoir; frequent dry-season gathering point."
+      )
+    )
+
+    # Boundary edges #4-7 — same four rows at the bottom of the Key Coordinates
+    # table. Each is drawn as its own highlighted edge (not just the faint
+    # rectangle) with a numbered badge at its midpoint, so every table row has
+    # a directly matching feature on the map.
+    ref_edges <- list(
+      list(
+        num = "4",
+        name = "Southern park boundary",
+        lng = c(80.872, 80.950),
+        lat = c(8.080, 8.080),
+        mid_lng = 80.911,
+        mid_lat = 8.080
+      ),
+      list(
+        num = "5",
+        name = "Northern park boundary",
+        lng = c(80.872, 80.950),
+        lat = c(8.220, 8.220),
+        mid_lng = 80.911,
+        mid_lat = 8.220
+      ),
+      list(
+        num = "6",
+        name = "Eastern boundary (HEC zone)",
+        lng = c(80.950, 80.950),
+        lat = c(8.080, 8.220),
+        mid_lng = 80.950,
+        mid_lat = 8.150
+      ),
+      list(
+        num = "7",
+        name = "Western park boundary",
+        lng = c(80.872, 80.872),
+        lat = c(8.080, 8.220),
+        mid_lng = 80.872,
+        mid_lat = 8.150
+      )
+    )
+
+    badge_label <- function(num, cls) {
+      htmltools::HTML(paste0("<span class='ref-badge ", cls, "'>", num, "</span>"))
+    }
+
+    m <- leaflet() |>
+      addProviderTiles(providers$OpenStreetMap) |>
+      addPolygons(
+        data = park_boundary,
+        lng = ~lon,
+        lat = ~lat,
+        color = "#2e7d32",
+        weight = 1,
+        dashArray = "6 4",
+        fill = TRUE,
+        fillColor = "#2e7d32",
+        fillOpacity = 0.06,
+        label = "Kaudulla National Park \u2014 approximate boundary used for all reference lines"
+      )
+
+    # Boundary edges (#4-7): highlighted orange segment + numbered badge
+    for (e in ref_edges) {
+      m <- m |>
+        addPolylines(
+          lng = e$lng,
+          lat = e$lat,
+          color = "#c1440e",
+          weight = 4,
+          opacity = 0.85,
+          dashArray = "8 5",
+          label = paste0("#", e$num, " \u2014 ", e$name)
+        ) |>
+        addLabelOnlyMarkers(
+          lng = e$mid_lng,
+          lat = e$mid_lat,
+          label = badge_label(e$num, "boundary"),
+          labelOptions = labelOptions(
+            noHide = TRUE,
+            textOnly = TRUE,
+            direction = "center",
+            className = "leaflet-div-badge"
+          )
+        )
+    }
+
+    # Point features (#1-3): teal circle marker + numbered badge
+    m <- m |>
+      addCircleMarkers(
+        data = ref_points,
+        lng = ~lon,
+        lat = ~lat,
+        radius = 9,
+        color = "#0f766e",
+        fillColor = "#4fc3f7",
+        fillOpacity = 0.9,
+        stroke = TRUE,
+        weight = 2,
+        popup = ~ paste0(
+          "<b>#",
+          num,
+          " \u2014 ",
+          name,
+          "</b><br>",
+          round(lat, 3),
+          "\u00B0N, ",
+          round(lon, 3),
+          "\u00B0E<br>",
+          note
+        )
+      ) |>
+      addLabelOnlyMarkers(
+        data = ref_points,
+        lng = ~lon,
+        lat = ~lat,
+        label = ~ lapply(num, badge_label, cls = "core"),
+        labelOptions = labelOptions(
+          noHide = TRUE,
+          textOnly = TRUE,
+          direction = "center",
+          className = "leaflet-div-badge"
+        )
+      ) |>
+      addLegend(
+        position = "bottomright",
+        colors = c("#0f766e", "#c1440e"),
+        labels = c("Key point (badges 1\u20133)", "Boundary line (badges 4\u20137)"),
+        opacity = 0.9
+      ) |>
+      setView(lng = 80.905, lat = 8.15, zoom = 12)
+
+    m
+  })
+
   # ── Monthly aggregation for heat maps ───────────────────────────────────────
   heat_data <- reactive({
     df <- filtered()
@@ -374,10 +625,12 @@ server <- function(input, output, session) {
 
     df <- df %>% mutate(ym = format(datetime_sl, "%Y-%m"))
     months_seq <- format(
-      seq(as.Date(format(min(df$datetime_sl), "%Y-%m-01")),
+      seq(
+        as.Date(format(min(df$datetime_sl), "%Y-%m-01")),
         as.Date(format(max(df$datetime_sl), "%Y-%m-01")),
         by = "month"
-      ), "%Y-%m"
+      ),
+      "%Y-%m"
     )
     names_seq <- sort(unique(df$name))
 
@@ -385,7 +638,10 @@ server <- function(input, output, session) {
       group_by(name, ym) %>%
       summarise(mlon = mean(lon, na.rm = TRUE), n = n(), .groups = "drop")
 
-    mat_lon <- matrix(NA_real_, length(names_seq), length(months_seq),
+    mat_lon <- matrix(
+      NA_real_,
+      length(names_seq),
+      length(months_seq),
       dimnames = list(names_seq, months_seq)
     )
     mat_n <- mat_lon
@@ -399,7 +655,10 @@ server <- function(input, output, session) {
   output$heat_lon <- renderPlotly({
     hd <- heat_data()
     plot_ly(
-      x = hd$months, y = hd$names, z = hd$mat_lon, type = "heatmap",
+      x = hd$months,
+      y = hd$names,
+      z = hd$mat_lon,
+      type = "heatmap",
       colors = colorRamp(c("#f1faee", "#2a9d8f", "#e9c46a", "#e63946")),
       hoverongaps = FALSE,
       colorbar = list(
@@ -410,7 +669,8 @@ server <- function(input, output, session) {
       hovertemplate = "%{y}<br>%{x}<br>Mean lon %{z:.4f}\u00B0E<extra></extra>"
     ) %>%
       layout(
-        paper_bgcolor = "#ffffff", plot_bgcolor = "#ffffff",
+        paper_bgcolor = "#ffffff",
+        plot_bgcolor = "#ffffff",
         font = list(color = "#333333", family = "Segoe UI"),
         xaxis = list(title = "Month", tickangle = -45, gridcolor = "#e5e5e5"),
         yaxis = list(title = "", autorange = "reversed", gridcolor = "#e5e5e5"),
@@ -422,7 +682,10 @@ server <- function(input, output, session) {
   output$heat_n <- renderPlotly({
     hd <- heat_data()
     plot_ly(
-      x = hd$months, y = hd$names, z = hd$mat_n, type = "heatmap",
+      x = hd$months,
+      y = hd$names,
+      z = hd$mat_n,
+      type = "heatmap",
       colors = colorRamp(c("#f1faee", "#ff9f1c", "#e63946")),
       hoverongaps = FALSE,
       colorbar = list(
@@ -433,7 +696,8 @@ server <- function(input, output, session) {
       hovertemplate = "%{y}<br>%{x}<br>%{z} fixes<extra></extra>"
     ) %>%
       layout(
-        paper_bgcolor = "#ffffff", plot_bgcolor = "#ffffff",
+        paper_bgcolor = "#ffffff",
+        plot_bgcolor = "#ffffff",
         font = list(color = "#333333", family = "Segoe UI"),
         xaxis = list(title = "Month", tickangle = -45, gridcolor = "#e5e5e5"),
         yaxis = list(title = "", autorange = "reversed", gridcolor = "#e5e5e5"),
@@ -442,19 +706,16 @@ server <- function(input, output, session) {
       config(displaylogo = FALSE)
   })
 
-
   # ── Elephant tracking ───────────────────────────────────────────────────────────────
   # Color palette for tracking
-  color_palette_tracking <- colorFactor(
-    palette = elephant_colors,
-    domain = df_sf$name
-  )
+  color_palette_tracking <- colorFactor(palette = elephant_colors, domain = df_sf$name)
 
   # Tracking Map
   output$tracking_map <- renderLeaflet({
     leaflet(df_sf) %>%
       addProviderTiles(providers$OpenStreetMap, group = "Street Map") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+
       # POINTS
       addCircleMarkers(
         color = ~ color_palette_tracking(name),
@@ -462,11 +723,15 @@ server <- function(input, output, session) {
         stroke = FALSE,
         fillOpacity = 0.8,
         popup = ~ paste(
-          "<b>Date:</b>", datetime,
-          "<br><b>Gender:</b>", sex,
-          "<br><b>Name:</b>", name
+          "<b>Date:</b>",
+          datetime,
+          "<br><b>Gender:</b>",
+          sex,
+          "<br><b>Name:</b>",
+          name
         )
       ) %>%
+
       # LEGEND
       addLegend(
         pal = color_palette_tracking,
@@ -474,6 +739,7 @@ server <- function(input, output, session) {
         title = "Elephant Name",
         position = "bottomright"
       ) %>%
+
       # LAYERS CONTROL
       addLayersControl(
         baseGroups = c("Street Map", "Satellite"),
@@ -484,27 +750,11 @@ server <- function(input, output, session) {
   # Tracking Data Plot
   output$tracking_plot <- renderPlot({
     ggplot() +
-      geom_sf(
-        data = df_sf,
-        aes(color = factor(name)),
-        size = 0.75,
-        alpha = 0.5
-      ) +
+      geom_sf(data = df_sf, aes(color = factor(name)), size = 0.75, alpha = 0.5) +
       theme_minimal() +
-      scale_color_manual(
-        values = elephant_colors,
-        name = "Name"
-      ) +
-      guides(
-        color = guide_legend(
-          override.aes = list(size = 3, alpha = 1)
-        )
-      ) +
-      labs(
-        title = "Tracking Data",
-        x = "Longitude",
-        y = "Latitude"
-      ) +
+      scale_color_manual(values = elephant_colors, name = "Name") +
+      guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+      labs(title = "Tracking Data", x = "Longitude", y = "Latitude") +
       theme(
         plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
         legend.position = "right"
@@ -524,24 +774,12 @@ server <- function(input, output, session) {
     n_col <- min(4, n_elephants)
 
     ggplot() +
-      geom_sf(
-        data = df_sf,
-        aes(color = sex),
-        size = 3,
-        alpha = 0.5
-      ) +
+      geom_sf(data = df_sf, aes(color = sex), size = 3, alpha = 0.5) +
       facet_wrap(~name, ncol = n_col) +
       coord_sf() +
       theme_minimal() +
-      scale_color_manual(
-        values = sex_colors,
-        name = "Sex"
-      ) +
-      labs(
-        title = "GPS Tracking Data by Elephant",
-        x = "Longitude",
-        y = "Latitude"
-      ) +
+      scale_color_manual(values = sex_colors, name = "Sex") +
+      labs(title = "GPS Tracking Data by Elephant", x = "Longitude", y = "Latitude") +
       theme(
         plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
         axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5),
@@ -568,9 +806,7 @@ server <- function(input, output, session) {
   output$calendar_plot <- renderPlot({
     df <- gps_data_reactive()
 
-    validate(
-      need(nrow(df) > 0, "No data available for the selected elephant.")
-    )
+    validate(need(nrow(df) > 0, "No data available for the selected elephant."))
 
     # We execute the function directly within the renderPlot space
     calendarHeat(
@@ -580,48 +816,32 @@ server <- function(input, output, session) {
       colors = my_colors2,
       title = paste("Daily GPS Availability Calendar Heatmap -", input$selected_elephant),
       colorkey = FALSE,
-      legend = list(
-        right = list(
-          fun = draw.key,
-          args = list(key = discrete_key)
-        )
-      )
+      legend = list(right = list(fun = draw.key, args = list(key = discrete_key)))
     )
   })
 
   # populate year dropdown
   observe({
-    updateSelectInput(session, "year",
-      choices = sort(unique(df_sf$year))
-    )
+    updateSelectInput(session, "year", choices = sort(unique(df_sf$year)))
 
-    updateSelectInput(session, "month",
-      choices = sprintf("%02d", 1:12)
-    )
+    updateSelectInput(session, "month", choices = sprintf("%02d", 1:12))
 
-    updateSelectInput(session, "elephant",
-      choices = sort(unique(df_sf$name))
-    )
+    updateSelectInput(session, "elephant", choices = sort(unique(df_sf$name)))
   })
 
   # reactive filtered dataset (IMPORTANT FIX)
   df_filtered <- reactive({
     req(input$year, input$month, input$elephant)
 
-    df_sf |>
-      filter(
-        year == input$year,
-        month == input$month,
-        name == input$elephant
-      )
+    df_sf |> filter(year == input$year, month == input$month, name == input$elephant)
   })
 
   output$map <- renderLeaflet({
     dat <- df_filtered()
 
-    # ==========================================================
+    #==========================================================
     # CASE 1: NO DATA → SHOW EMPTY STREET MAP WITH MESSAGE
-    # ==========================================================
+    #==========================================================
     if (nrow(dat) == 0) {
       leaflet() |>
         addProviderTiles(providers$OpenStreetMap) |>
@@ -631,21 +851,16 @@ server <- function(input, output, session) {
           popup = "<b>No elephant data available for selected year & month</b>"
         ) |>
         setView(lng = 80.0, lat = 7.0, zoom = 7)
-    }
-
-    # ==========================================================
-    # CASE 2: DATA EXISTS → PLOT MAP
-    # ==========================================================
-    else {
+    } else {
+      #==========================================================
+      # CASE 2: DATA EXISTS → PLOT MAP
+      #==========================================================
       elephant_list <- sort(unique(dat$name))
 
-      m <- leaflet(dat) |>
-        addProviderTiles(providers$OpenStreetMap) # ONLY STREET MAP
+      m <- leaflet(dat) |> addProviderTiles(providers$OpenStreetMap) # ONLY STREET MAP
 
       for (e in elephant_list) {
-        d <- dat |>
-          filter(name == e) |>
-          arrange(datetime)
+        d <- dat |> filter(name == e) |> arrange(datetime)
 
         m <- m |>
           addCircleMarkers(
@@ -656,10 +871,14 @@ server <- function(input, output, session) {
             stroke = FALSE,
             fillOpacity = 1,
             popup = ~ paste0(
-              "<b>Elephant:</b> ", name,
-              "<br><b>Date:</b> ", datetime,
-              "<br><b>Year:</b> ", year,
-              "<br><b>Month:</b> ", month
+              "<b>Elephant:</b> ",
+              name,
+              "<br><b>Date:</b> ",
+              datetime,
+              "<br><b>Year:</b> ",
+              year,
+              "<br><b>Month:</b> ",
+              month
             )
           )
       }
@@ -675,9 +894,14 @@ server <- function(input, output, session) {
 
       data.frame(
         Measure = c(
-          "Minimum", "First Quantile (Q1)", "Median",
-          "Mean", "Third Quantile (Q3)", "Maximum",
-          "Standard Deviation", "Missing Values (NA)"
+          "Minimum",
+          "First Quantile (Q1)",
+          "Median",
+          "Mean",
+          "Third Quantile (Q3)",
+          "Maximum",
+          "Standard Deviation",
+          "Missing Values (NA)"
         ),
         Value = c(
           min(vals, na.rm = TRUE),
@@ -709,8 +933,12 @@ server <- function(input, output, session) {
     )
 
     calendarHeat(
-      dates = dates, values = info$values, at = info$breaks, colors = my_colors,
-      title = info$title, colorkey = FALSE,
+      dates = dates,
+      values = info$values,
+      at = info$breaks,
+      colors = my_colors,
+      title = info$title,
+      colorkey = FALSE,
       legend = list(right = list(fun = draw.key, args = list(key = discrete_key)))
     )
   })
@@ -718,22 +946,31 @@ server <- function(input, output, session) {
   # ── Data table ───────────────────────────────────────────────────────────────
   output$data_table <- renderDT({
     df <- filtered() %>%
-      select(name, sex, datetime_sl, lat, lon, imputed) %>%
+      select(name, sex, datetime_sl, lat, lon) %>%
       mutate(
         datetime_sl = format(datetime_sl, "%d %b %Y %H:%M"),
-        lat = round(lat, 6), lon = round(lon, 6)
+        lat = round(lat, 6),
+        lon = round(lon, 6)
       ) %>%
       rename(
-        Elephant = name, Sex = sex, `Date/Time (SL)` = datetime_sl,
-        Latitude = lat, Longitude = lon, Imputed = imputed
+        Elephant = name,
+        Sex = sex,
+        `Date/Time (SL)` = datetime_sl,
+        Latitude = lat,
+        Longitude = lon
       )
 
-    datatable(df,
+    datatable(
+      df,
       options = list(
-        pageLength = 20, scrollX = TRUE,
-        dom = "Bfrtip", buttons = c("csv", "excel")
+        pageLength = 20,
+        scrollX = TRUE,
+        dom = "Bfrtip",
+        buttons = c("csv", "excel")
       ),
-      rownames = FALSE, class = "stripe hover", extensions = "Buttons"
+      rownames = FALSE,
+      class = "stripe hover",
+      extensions = "Buttons"
     )
   })
 }

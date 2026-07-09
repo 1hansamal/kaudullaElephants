@@ -1,41 +1,21 @@
-library(shiny)
-library(shinydashboard)
-library(plotly)
-library(dplyr)
-library(DT)
-library(dplyr)
-library(sf)
-library(readr)
-library(plotly)
-library(adehabitatHR)
-library(leaflet)
-library(htmltools)
-library(yyjsonr)
-library(shiny)
-library(readxl)
-library(lattice)
-library(grid)
-library(ggplot2)
-library(lubridate)
-
-
-# ==============================================================
+#==============================================================
 # 5. UI
-# ==============================================================
+#==============================================================
 ui <- dashboardPage(
   skin = "green",
+  
   dashboardHeader(
     title = tags$span(
-      tags$img(
-        src = "https://upload.wikimedia.org/wikipedia/commons/1/11/Flag_of_Sri_Lanka.svg",
-        height = "22px", style = "margin-right:8px; vertical-align:middle;"
-      ),
+      tags$img(src = "https://upload.wikimedia.org/wikipedia/commons/1/11/Flag_of_Sri_Lanka.svg",
+               height = "22px", style = "margin-right:8px; vertical-align:middle;"),
       "Kaudulla Elephant Tracker"
     ),
     titleWidth = 320
   ),
+  
   dashboardSidebar(
     width = 270,
+    
     tags$div(
       style = "padding:14px 16px 6px; color:#ccc; font-size:12px; line-height:1.5;",
       tags$b("Kaudulla National Park"), tags$br(),
@@ -44,59 +24,64 @@ ui <- dashboardPage(
       tags$hr(style = "border-color:#444; margin:8px 0;"),
       tags$i("GPS Collar Monitoring Programme"), tags$br(),
       tags$a("Wildlife Department of Sri Lanka",
-        href = "https://wildlife.gov.lk", target = "_blank",
-        style = "color:#8bc34a;"
-      ),
+             href = "https://wildlife.gov.lk", target = "_blank",
+             style = "color:#8bc34a;"),
       tags$hr(style = "border-color:#444; margin:8px 0;")
     ),
+    
     sidebarMenu(
-      menuItem("Latitude vs Time", tabName = "lat_tab", icon = icon("chart-line")),
-      menuItem("Longitude vs Time", tabName = "lon_tab", icon = icon("chart-line")),
-      menuItem("Both Coordinates", tabName = "both_tab", icon = icon("layer-group")),
-      menuItem("Heat Maps", tabName = "heat_tab", icon = icon("fire")),
-      menuItem("Elephant Tracking", tabName = "tracking_tab", icon = icon("map")),
-      menuItem("Migration & Climate", tabName = "climate_tab", icon = icon("globe")),
-      menuItem("Data Table", tabName = "data_tab", icon = icon("table"))
+      menuItem("Latitude vs Time",   tabName = "lat_tab",  icon = icon("chart-line")),
+      menuItem("Longitude vs Time",  tabName = "lon_tab",  icon = icon("chart-line")),
+      menuItem("Both Coordinates",   tabName = "both_tab", icon = icon("layer-group")),
+      menuItem("Heat Maps",          tabName = "heat_tab", icon = icon("fire")),
+      menuItem("Elephant Tracking", tabName = "tracking_tab",icon = icon("map")),
+      menuItem("Migration & Climate", tabName = "climate_tab",icon = icon("globe")),
+      menuItem("Home Range & Speed", tabName = "mcp_tab", icon = icon("compass")),
+      menuItem("Data Table",         tabName = "data_tab", icon = icon("table"))
     ),
+    
     tags$hr(style = "border-color:#444; margin:4px 0;"),
-    tags$div(
-      style = "padding:0 16px;",
-      selectInput(
-        "sel_elephants", "Select Elephants",
-        choices = sort(unique(elephants_df$name)),
-        selected = sort(unique(elephants_df$name)),
-        multiple = TRUE
-      ),
-      tags$div(
-        style = "display:flex; gap:4px; margin:-4px 0 8px;",
-        actionButton("btn_all", "All", class = "btn-xs", style = "flex:1; font-size:11px;"),
-        actionButton("btn_female", "Females", class = "btn-xs", style = "flex:1; font-size:11px;"),
-        actionButton("btn_male", "Males", class = "btn-xs", style = "flex:1; font-size:11px;"),
-        actionButton("btn_clear", "Clear", class = "btn-xs", style = "flex:1; font-size:11px;")
-      ),
-      checkboxInput("show_imputed", "Show imputed points", value = TRUE),
-      tags$hr(style = "border-color:#444; margin:4px 0;"),
-      dateRangeInput(
-        "date_range", "Date Range",
-        start = min(elephants_df$date_parsed, na.rm = TRUE),
-        end = max(elephants_df$date_parsed, na.rm = TRUE),
-        min = min(elephants_df$date_parsed, na.rm = TRUE),
-        max = max(elephants_df$date_parsed, na.rm = TRUE),
-        format = "dd M yyyy"
-      ),
-      checkboxInput("add_smooth", "Add LOESS smoother", value = FALSE),
-      tags$hr(style = "border-color:#444; margin:4px 0;"),
-      radioButtons(
-        "agg_level", "Time Resolution",
-        choices = c(
-          "Raw (hourly)" = "raw",
-          "Daily mean" = "day",
-          "Weekly mean" = "week"
-        ),
-        selected = "raw",
-        inline = FALSE
-      )
+    
+    tags$div(style = "padding:0 16px;",
+             selectInput(
+               "sel_elephants", "Select Elephants",
+               choices  = sort(unique(elephants_df$name)),
+               selected = sort(unique(elephants_df$name)),
+               multiple = TRUE
+             ),
+             
+             tags$div(style = "display:flex; gap:4px; margin:-4px 0 8px;",
+                      actionButton("btn_all",   "All",     class = "btn-xs", style = "flex:1; font-size:11px;"),
+                      actionButton("btn_female","Females", class = "btn-xs", style = "flex:1; font-size:11px;"),
+                      actionButton("btn_male",  "Males",   class = "btn-xs", style = "flex:1; font-size:11px;"),
+                      actionButton("btn_clear", "Clear",   class = "btn-xs", style = "flex:1; font-size:11px;")
+             ),
+             
+             tags$hr(style = "border-color:#444; margin:4px 0;"),
+             
+             dateRangeInput(
+               "date_range", "Date Range",
+               start = min(elephants_df$date_parsed, na.rm = TRUE),
+               end   = max(elephants_df$date_parsed, na.rm = TRUE),
+               min   = min(elephants_df$date_parsed, na.rm = TRUE),
+               max   = max(elephants_df$date_parsed, na.rm = TRUE),
+               format = "dd M yyyy"
+             ),
+             
+             checkboxInput("add_smooth", "Add LOESS smoother", value = FALSE),
+             
+             tags$hr(style = "border-color:#444; margin:4px 0;"),
+             
+             radioButtons(
+               "agg_level", "Time Resolution",
+               choices  = c("Raw (hourly)" = "raw",
+                            "Daily mean"   = "day",
+                            "Weekly mean"  = "week"),
+               selected = "raw",
+               inline   = FALSE
+             )
     ),
+    
     tags$div(
       style = "padding:10px 16px 4px; font-size:10px; color:#888; line-height:1.4;",
       tags$b("Key Literature"), tags$br(),
@@ -105,7 +90,9 @@ ui <- dashboardPage(
       "Ratnayeke et al. (2023)"
     )
   ),
+  
   dashboardBody(
+    
     tags$head(
       tags$style(HTML("
 
@@ -415,6 +402,21 @@ table.dataTable td{
   border:1px solid #dbe4ee;
 }
 
+/* Numbered reference badges — shared between the reference map and the
+   Key Coordinates table below it, so each map feature can be matched
+   to its exact row at a glance. */
+.ref-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px; border-radius:50%;
+  font-size:11px; font-weight:700; color:#ffffff;
+  box-shadow:0 0 0 2px rgba(255,255,255,0.9), 0 1px 3px rgba(0,0,0,0.35);
+  line-height:1;
+}
+.ref-badge.core{ background:#0f766e; }
+.ref-badge.boundary{ background:#c1440e; }
+
+.leaflet-div-badge{ background:transparent !important; border:none !important; }
+
 /*====================================================
   PLOTLY
 ====================================================*/
@@ -451,345 +453,385 @@ table.dataTable td{
 
 "))
     ),
+    
     tabItems(
+      
       # ── TAB 1 : Latitude vs Time ─────────────────────────────────────────────
-      tabItem(
-        "lat_tab",
-        fluidRow(
-          valueBoxOutput("vbox_obs", width = 3),
-          valueBoxOutput("vbox_eleph", width = 3),
-          valueBoxOutput("vbox_start", width = 3),
-          valueBoxOutput("vbox_end", width = 3)
-        ),
-        fluidRow(
-          box(
-            title = "\U0001F4CD Latitude vs Time — GPS Collar Data, Kaudulla National Park",
-            width = 12, solidHeader = TRUE,
-            tags$p(
-              style = "color:#666; font-size:11px; margin-bottom:6px;",
-              "Kaudulla elephants range roughly between latitudes 8.10\u00B0N and 8.25\u00B0N.",
-              "The park boundary lies around 8.08\u00B0\u20138.22\u00B0N (Fernando et al. 2008).",
-              "Northward movement often corresponds to the seasonal arrival at",
-              "Kaudulla tank when Minneriya dries (Ratnayeke et al. 2023)."
-            ),
-            plotlyOutput("plot_lat", height = "460px")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "\U0001F4DA Literature Context — Latitude & Elephant Ranging in Sri Lanka",
-            width = 12, solidHeader = TRUE,
-            tags$div(
-              style = "display:flex; flex-wrap:wrap; gap:20px; padding:4px 0;",
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Fernando et al. (2008)", class = "ref-heading"),
-                tags$p("Home ranges of Sri Lankan elephants averaged 46\u2013103 km\u00B2,
+      tabItem("lat_tab",
+              fluidRow(
+                valueBoxOutput("vbox_obs",   width = 3),
+                valueBoxOutput("vbox_eleph", width = 3),
+                valueBoxOutput("vbox_start", width = 3),
+                valueBoxOutput("vbox_end",   width = 3)
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4CD Latitude vs Time — GPS Collar Data, Kaudulla National Park",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Kaudulla elephants range roughly between latitudes 8.10\u00B0N and 8.25\u00B0N.",
+                    "The park boundary lies around 8.08\u00B0\u20138.22\u00B0N (Fernando et al. 2008).",
+                    "Northward movement often corresponds to the seasonal arrival at",
+                    "Kaudulla tank when Minneriya dries (Ratnayeke et al. 2023)."
+                  ),
+                  plotlyOutput("plot_lat", height = "460px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4DA Literature Context — Latitude & Elephant Ranging in Sri Lanka",
+                  width = 12, solidHeader = TRUE,
+                  tags$div(style = "display:flex; flex-wrap:wrap; gap:20px; padding:4px 0;",
+                           
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Fernando et al. (2008)", class = "ref-heading"),
+                                    tags$p("Home ranges of Sri Lankan elephants averaged 46\u2013103 km\u00B2,
                         with latitudinal movement of 0.1\u00B0\u20130.3\u00B0 correlated with
                         seasonal tank water levels in the dry zone.", class = "ref-text")
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Ratnayeke et al. (2023)", class = "ref-heading"),
-                tags$p("Kaudulla\u2013Minneriya corridor study showed elephants shift
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Ratnayeke et al. (2023)", class = "ref-heading"),
+                                    tags$p("Kaudulla\u2013Minneriya corridor study showed elephants shift
                         northward (higher latitude) into Kaudulla from May\u2013October
                         when the Minneriya tank partially dries, with peak
                         aggregations in August\u2013September.", class = "ref-text")
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Wildlife Department of Sri Lanka", class = "ref-heading"),
-                tags$p("The Department's GPS collar programme in Kaudulla National Park
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Wildlife Department of Sri Lanka", class = "ref-heading"),
+                                    tags$p("The Department's GPS collar programme in Kaudulla National Park
                         (est. 2002, 6,900 ha) monitors movement to inform HEC
                         (Human\u2013Elephant Conflict) mitigation and corridor management.",
-                  class = "ref-text"
-                ),
-                tags$a("wildlife.gov.lk",
-                  href = "https://wildlife.gov.lk",
-                  target = "_blank", style = "color:#2e7d32; font-size:11px;"
-                )
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Geographic Reference", class = "ref-heading"),
-                tags$p("Latitude 8.10\u00B0\u20138.25\u00B0N (WGS84). Kaudulla tank (reservoir)
+                                           class = "ref-text"),
+                                    tags$a("wildlife.gov.lk", href = "https://wildlife.gov.lk",
+                                           target = "_blank", style = "color:#2e7d32; font-size:11px;")
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Geographic Reference", class = "ref-heading"),
+                                    tags$p("Latitude 8.10\u00B0\u20138.25\u00B0N (WGS84). Kaudulla tank (reservoir)
                         at ~8.14\u00B0N is a key dry-season water source. The Mahaweli
                         River floodplain at ~8.22\u00B0N forms the northern park boundary.",
-                  class = "ref-text"
+                                           class = "ref-text")
+                           )
+                  )
                 )
               )
-            )
-          )
-        )
       ),
-
+      
       # ── TAB 2 : Longitude vs Time ────────────────────────────────────────────
-      tabItem(
-        "lon_tab",
-        fluidRow(
-          box(
-            title = "\U0001F4CD Longitude vs Time — GPS Collar Data, Kaudulla National Park",
-            width = 12, solidHeader = TRUE,
-            tags$p(
-              style = "color:#666; font-size:11px; margin-bottom:6px;",
-              "Longitudes span 80.87\u00B0\u201380.96\u00B0E. The Kaudulla tank lies near 80.90\u00B0E.",
-              "Elephants moving eastward (higher longitude) approach the park's",
-              "eastern boundary, which borders agricultural land — a key HEC zone",
-              "(Pastorini et al. 2010; Wildlife Dept. Sri Lanka 2023 Annual Report)."
-            ),
-            plotlyOutput("plot_lon", height = "460px")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "\U0001F4DA Literature Context — Longitude & East\u2013West Ranging",
-            width = 12, solidHeader = TRUE,
-            tags$div(
-              style = "display:flex; flex-wrap:wrap; gap:20px; padding:4px 0;",
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Pastorini et al. (2010)", class = "ref-heading"),
-                tags$p("Genetic analysis of Sri Lankan elephants confirmed
+      tabItem("lon_tab",
+              fluidRow(
+                box(
+                  title = "\U0001F4CD Longitude vs Time — GPS Collar Data, Kaudulla National Park",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Longitudes span 80.87\u00B0\u201380.96\u00B0E. The Kaudulla tank lies near 80.90\u00B0E.",
+                    "Elephants moving eastward (higher longitude) approach the park's",
+                    "eastern boundary, which borders agricultural land — a key HEC zone",
+                    "(Pastorini et al. 2010; Wildlife Dept. Sri Lanka 2023 Annual Report)."
+                  ),
+                  plotlyOutput("plot_lon", height = "460px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4DA Literature Context — Longitude & East\u2013West Ranging",
+                  width = 12, solidHeader = TRUE,
+                  tags$div(style = "display:flex; flex-wrap:wrap; gap:20px; padding:4px 0;",
+                           
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Pastorini et al. (2010)", class = "ref-heading"),
+                                    tags$p("Genetic analysis of Sri Lankan elephants confirmed
                         east\u2013west sub-population structure partly driven by
                         the Mahaweli River. Kaudulla elephants belong to the
                         eastern dry-zone meta-population.", class = "ref-text")
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Leimgruber et al. (2008)", class = "ref-heading"),
-                tags$p("Longitude displacement of >0.05\u00B0 per day indicates
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Leimgruber et al. (2008)", class = "ref-heading"),
+                                    tags$p("Longitude displacement of >0.05\u00B0 per day indicates
                         long-range foraging excursions beyond the core
                         Kaudulla\u2013Minneriya protected area, with agriculture
                         along the eastern boundary being the primary
                         conflict zone.", class = "ref-text")
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("HEC Hotspot — Eastern Boundary", class = "ref-heading"),
-                tags$p("Longitudes >80.94\u00B0E place elephants near the
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("HEC Hotspot — Eastern Boundary", class = "ref-heading"),
+                                    tags$p("Longitudes >80.94\u00B0E place elephants near the
                         Giritale\u2013Hingurakgoda road and paddy fields.
                         Wildlife Dept. electric fence lines run along
                         ~80.95\u00B0E on the eastern park edge.", class = "ref-text")
-              ),
-              tags$div(
-                style = "flex:1; min-width:220px;",
-                tags$h4("Geographic Reference", class = "ref-heading"),
-                tags$p("Longitude 80.87\u00B0\u201380.96\u00B0E (WGS84). Kaudulla tank
+                           ),
+                           tags$div(style = "flex:1; min-width:220px;",
+                                    tags$h4("Geographic Reference", class = "ref-heading"),
+                                    tags$p("Longitude 80.87\u00B0\u201380.96\u00B0E (WGS84). Kaudulla tank
                         central axis \u224880.89\u00B0E. National Highway A11
                         (Habarana\u2013Trincomalee) crosses the corridor
                         near 80.93\u00B0E and is a major elephant crossing point.",
-                  class = "ref-text"
+                                           class = "ref-text")
+                           )
+                  )
                 )
               )
-            )
-          )
-        )
       ),
-
+      
       # ── TAB 3 : Both coordinates ─────────────────────────────────────────────
-      tabItem(
-        "both_tab",
-        fluidRow(
-          box(
-            title = "\U0001F4CD Latitude & Longitude vs Time (Overlaid, Dual Y-Axis)",
-            width = 12, solidHeader = TRUE,
-            tags$p(
-              style = "color:#666; font-size:11px; margin-bottom:6px;",
-              "Latitude (solid lines, circles, left axis) and longitude",
-              "(dotted lines, triangles, right axis) are plotted on the",
-              "same chart per elephant, using matching colours. Correlated",
-              "dips in latitude with rising longitude typically indicate",
-              "movement toward agricultural areas on the eastern boundary."
-            ),
-            plotlyOutput("plot_both", height = "600px")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "\U0001F418 About The Gathering — Kaudulla National Park",
-            width = 8, solidHeader = TRUE,
-            tags$p(
-              style = "color:#444; font-size:12px; line-height:1.7;",
-              tags$b("Kaudulla National Park"), " was gazetted in 2002 specifically
+      tabItem("both_tab",
+              fluidRow(
+                box(
+                  title = "\U0001F4CD Latitude & Longitude vs Time (Overlaid, Dual Y-Axis)",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Latitude (solid lines, circles, left axis) and longitude",
+                    "(dotted lines, triangles, right axis) are plotted on the",
+                    "same chart per elephant, using matching colours. Correlated",
+                    "dips in latitude with rising longitude typically indicate",
+                    "movement toward agricultural areas on the eastern boundary."
+                  ),
+                  plotlyOutput("plot_both", height = "600px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F5FA Reference Map — Kaudulla Tank & Park Boundary",
+                  width = 5, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Approximate park boundary (dashed) and the Kaudulla Tank",
+                    "reference point used throughout the Latitude/Longitude tabs.",
+                    "This is the geographic anchor for every reference line and",
+                    "excursion described elsewhere in the dashboard."
+                  ),
+                  leafletOutput("kaudulla_ref_map", height = "420px")
+                ),
+                box(
+                  title = "\U0001F4CD Key Coordinates",
+                  width = 7, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:8px;",
+                    "Each numbered badge below matches the same badge on the reference map",
+                    "— \u25CF teal numbers are point features, \u25CF orange numbers are boundary lines."
+                  ),
+                  tags$table(
+                    class = "table table-condensed",
+                    style = "font-size:12px; color:#444;",
+                    tags$thead(
+                      tags$tr(
+                        tags$th("#"), tags$th("Location"), tags$th("Latitude"), tags$th("Longitude"), tags$th("Relevance to elephant movement")
+                      )
+                    ),
+                    tags$tbody(
+                      tags$tr(tags$td(tags$span(class = "ref-badge core", "1")), tags$td(tags$b("Kaudulla Tank (core reference)")), tags$td("8.140\u00B0N"), tags$td("80.895\u00B0E"),
+                              tags$td("Dry-season water source; latitudinal reference line on the Lat/Lon tabs")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge core", "2")), tags$td("Park entrance / safari zone"), tags$td("8.111\u00B0N"), tags$td("80.886\u00B0E"),
+                              tags$td("Southwestern edge of range; low elephant density")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge core", "3")), tags$td("Kaudulla Wewa (mapped reservoir)"), tags$td("8.168\u00B0N"), tags$td("80.926\u00B0E"),
+                              tags$td("Northeastern shoreline; frequent gathering point in dry months")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge boundary", "4")), tags$td("Southern park boundary"), tags$td("8.080\u00B0N"), tags$td("\u2014"),
+                              tags$td("Southward range limit shown as a reference line on the Latitude tab")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge boundary", "5")), tags$td("Northern park boundary"), tags$td("8.220\u00B0N"), tags$td("\u2014"),
+                              tags$td("Northward range limit shown as a reference line on the Latitude tab")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge boundary", "6")), tags$td("Eastern boundary (HEC zone)"), tags$td("\u2014"), tags$td("80.950\u00B0E"),
+                              tags$td("Agricultural edge; excursions beyond this longitude flag conflict risk")),
+                      tags$tr(tags$td(tags$span(class = "ref-badge boundary", "7")), tags$td("Western park boundary"), tags$td("\u2014"), tags$td("80.872\u00B0E"),
+                              tags$td("Westward range limit shown as a reference line on the Longitude tab"))
+                    )
+                  ),
+                  tags$p(style = "color:#888; font-size:10px; margin-top:8px;",
+                         "Coordinates are approximate (WGS84) and are the same reference values used to draw the dashed lines on the Latitude, Longitude, and Both-Coordinates charts.")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F418 About The Gathering — Kaudulla National Park",
+                  width = 8, solidHeader = TRUE,
+                  tags$p(style = "color:#444; font-size:12px; line-height:1.7;",
+                         tags$b("Kaudulla National Park"), " was gazetted in 2002 specifically
               to protect the elephant corridor between Minneriya and Hurulu Eco Park.
               Together these three parks form the 'Trincomalee Elephant Triangle'.",
-              tags$br(), tags$br(),
-              "Every year between July and October, up to ", tags$b("300\u2013400 elephants"),
-              " converge at the Kaudulla and Minneriya tanks in what is known as ",
-              tags$b(style = "color:#2e7d32;", "'The Gathering'"),
-              " — one of the largest aggregations of Asian elephants in the world
+                         tags$br(), tags$br(),
+                         "Every year between July and October, up to ", tags$b("300\u2013400 elephants"),
+                         " converge at the Kaudulla and Minneriya tanks in what is known as ",
+                         tags$b(style = "color:#2e7d32;", "'The Gathering'"),
+                         " — one of the largest aggregations of Asian elephants in the world
               (Fernando et al. 2008; BBC Wildlife Magazine 2009).",
-              tags$br(), tags$br(),
-              "This GPS collar dataset documents the movement of ",
-              tags$b(style = "color:#2e7d32;", "14 individually identified elephants"),
-              " from July 2024 to June 2026, capturing seasonal latitudinal shifts,
+                         tags$br(), tags$br(),
+                         "This GPS collar dataset documents the movement of ",
+                         tags$b(style = "color:#2e7d32;", "14 individually identified elephants"),
+                         " from July 2024 to June 2026, capturing seasonal latitudinal shifts,
               boundary excursions, and corridor use."
-            )
-          ),
-          box(
-            title = "\U0001F3DB Wildlife Department Mandate",
-            width = 4, solidHeader = TRUE,
-            tags$p(
-              style = "color:#444; font-size:12px; line-height:1.7;",
-              "The Department of Wildlife Conservation of Sri Lanka (DWC),
+                  )
+                ),
+                box(
+                  title = "\U0001F3DB Wildlife Department Mandate",
+                  width = 4, solidHeader = TRUE,
+                  tags$p(style = "color:#444; font-size:12px; line-height:1.7;",
+                         "The Department of Wildlife Conservation of Sri Lanka (DWC),
               under the Ministry of Environment, administers Kaudulla under
               the Fauna and Flora Protection Ordinance (FFPO).",
-              tags$br(), tags$br(),
-              "The GPS collar programme contributes to:", tags$br(),
-              "\u2022 Human\u2013Elephant Conflict (HEC) early warning", tags$br(),
-              "\u2022 Corridor integrity assessment", tags$br(),
-              "\u2022 Population monitoring", tags$br(), tags$br(),
-              tags$a("wildlife.gov.lk",
-                href = "https://wildlife.gov.lk",
-                target = "_blank", style = "color:#2e7d32;"
+                         tags$br(), tags$br(),
+                         "The GPS collar programme contributes to:", tags$br(),
+                         "\u2022 Human\u2013Elephant Conflict (HEC) early warning", tags$br(),
+                         "\u2022 Corridor integrity assessment", tags$br(),
+                         "\u2022 Population monitoring", tags$br(), tags$br(),
+                         tags$a("wildlife.gov.lk", href = "https://wildlife.gov.lk",
+                                target = "_blank", style = "color:#2e7d32;")
+                  )
+                )
               )
-            )
-          )
-        )
       ),
-
-
+      
+      
+      
       # ── TAB 4 : Heat Maps ────────────────────────────────────────────────────
-      tabItem(
-        "heat_tab",
-        fluidRow(
-          box(
-            title = "\U0001F321 Average Longitude by Month — Position Heat Map (blank = no data)",
-            width = 12, solidHeader = TRUE,
-            tags$p(
-              style = "color:#bbb; font-size:11px; margin-bottom:6px;",
-              "Cell colour = mean longitude of GPS fixes for that elephant in that",
-              "month (warmer = further east, toward the agricultural boundary;",
-              "cooler = further west, toward the tank). Blank cells mean the",
-              "elephant had no GPS fixes recorded that month within the current filters."
-            ),
-            plotlyOutput("heat_lon", height = "420px")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "\U0001F4CA Data Coverage by Month — GPS Fix Count Heat Map",
-            width = 12, solidHeader = TRUE,
-            tags$p(
-              style = "color:#bbb; font-size:11px; margin-bottom:6px;",
-              "Cell colour = number of GPS fixes recorded for that elephant in",
-              "that month. Darker/blank cells flag months with sparse or missing",
-              "collar data — useful for spotting collar failures or animals that",
-              "temporarily left monitoring range."
-            ),
-            plotlyOutput("heat_n", height = "420px")
-          )
-        )
+      tabItem("heat_tab",
+              fluidRow(
+                box(
+                  title = "\U0001F321 Average Longitude by Month — Position Heat Map (blank = no data)",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#bbb; font-size:11px; margin-bottom:6px;",
+                    "Cell colour = mean longitude of GPS fixes for that elephant in that",
+                    "month (warmer = further east, toward the agricultural boundary;",
+                    "cooler = further west, toward the tank). Blank cells mean the",
+                    "elephant had no GPS fixes recorded that month within the current filters."
+                  ),
+                  plotlyOutput("heat_lon", height = "420px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4CA Data Coverage by Month — GPS Fix Count Heat Map",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#bbb; font-size:11px; margin-bottom:6px;",
+                    "Cell colour = number of GPS fixes recorded for that elephant in",
+                    "that month. Darker/blank cells flag months with sparse or missing",
+                    "collar data — useful for spotting collar failures or animals that",
+                    "temporarily left monitoring range."
+                  ),
+                  plotlyOutput("heat_n", height = "420px")
+                )
+              )
       ),
-
+      
       # ── TAB 5 : Elephant Tracking ────────────────────────────────────────────────────
-      tabItem(
-        "tracking_tab",
-        div(
-          class = "panel-box",
-          div(
-            class = "section-title",
-            "🗺️ Elephant Tracking Overview"
-          ),
-          div(
-            class = "sub-title",
-            "Interactive Map with Satellite View"
-          ),
-          leafletOutput("tracking_map", height = 600)
-        ),
-        div(
-          class = "panel-box",
-          div(
-            class = "sub-title",
-            "📊 Tracking Data Visualization"
-          ),
-          plotOutput("tracking_plot", height = 500, width = "100%")
-        ),
-        div(
-          class = "panel-box",
-          div(
-            class = "sub-title",
-            "👥 GPS Tracking Data by Individual Elephant"
-          ),
-          plotOutput("tracking_by_elephant", height = 800, width = "100%")
-        )
+      tabItem("tracking_tab",
+              div(class = "panel-box",
+                  
+                  div(class = "section-title",
+                      "🗺️ Elephant Tracking Overview"
+                  ),
+                  
+                  div(class = "sub-title",
+                      "Interactive Map with Satellite View"
+                  ),
+                  
+                  leafletOutput("tracking_map", height = 600)
+              ),
+              
+              div(class = "panel-box",
+                  
+                  div(class = "sub-title",
+                      "📊 Tracking Data Visualization"
+                  ),
+                  
+                  plotOutput("tracking_plot", height = 500, width = "100%")
+              ),
+              
+              div(class = "panel-box",
+                  
+                  div(class = "sub-title",
+                      "👥 GPS Tracking Data by Individual Elephant"
+                  ),
+                  
+                  plotOutput("tracking_by_elephant", height = 800, width = "100%")
+              )
       ),
-
-
+      
+      
       # ── TAB 6 : Migration & Climate ────────────────────────────────────────────────────
-      tabItem(
-        "climate_tab",
-        div(
-          class = "panel-box",
-          div(
-            class = "section-title",
-            "🐘 Elephant Tracking Data Availability"
-          ),
-          sidebarLayout(
-            sidebarPanel(
-              selectInput(
-                inputId = "selected_elephant",
-                label = "Select Elephant Name:",
-                choices = elephant_names,
-                selected = elephant_names[1]
+      tabItem("climate_tab",
+              div(class = "panel-box",
+                  
+                  div(class = "section-title",
+                      "🐘 Elephant Tracking Data Availability"
+                  ),
+                  sidebarLayout(
+                    sidebarPanel(
+                      selectInput(
+                        inputId = "selected_elephant",
+                        label = "Select Elephant Name:",
+                        choices = elephant_names,
+                        selected = elephant_names[1]
+                      ),
+                      hr(),
+                      helpText("This heatmap shows the percentage of valid GPS records captured per day (max 24 records/day).")
+                    ),
+                    
+                    mainPanel(
+                      plotOutput("calendar_plot", height = "600px")
+                    )
+                  )
               ),
-              hr(),
-              helpText("This heatmap shows the percentage of valid GPS records captured per day (max 24 records/day).")
-            ),
-            mainPanel(
-              plotOutput("calendar_plot", height = "600px")
-            )
-          )
-        ),
-        div(
-          class = "panel-box",
-          div(
-            class = "section-title",
-            "🐘 Elephant Migration Map"
-          ),
-          sidebarLayout(
-            sidebarPanel(
-              selectInput("year", "Select Year", choices = NULL),
-              selectInput("month", "Select Month", choices = sprintf("%02d", 1:12)),
-              selectInput("elephant", "Select Elephant", choices = NULL)
-            ),
-            mainPanel(
-              leafletOutput("map", height = 600)
-            )
-          )
-        ),
-        div(
-          class = "panel-box",
-          div(
-            class = "section-title",
-            "🌡 Climate Calendar Analysis"
-          ),
-          sidebarLayout(
-            sidebarPanel(
-              selectInput("variable",
-                "Climate Variable",
-                choices = names(plot_info)
+              
+              
+              div(class = "panel-box",
+                  
+                  div(class = "section-title",
+                      "🐘 Elephant Migration Map"
+                  ),
+                  sidebarLayout(
+                    sidebarPanel(
+                      selectInput("year", "Select Year", choices = NULL),
+                      selectInput("month", "Select Month", choices = sprintf("%02d", 1:12)),
+                      selectInput("elephant", "Select Elephant", choices = NULL)
+                    ),
+                    
+                    mainPanel(
+                      leafletOutput("map", height = 600)
+                    )
+                  )
               ),
-              h4("Summary Statistics"),
-              tableOutput("summaryTable")
-            ),
-            mainPanel(
-              plotOutput("calendarPlot", height = 500)
-            )
-          )
-        )
+              
+              
+              div(class = "panel-box",
+                  
+                  div(class = "section-title",
+                      "🌡 Climate Calendar Analysis"
+                  ),
+                  
+                  sidebarLayout(
+                    
+                    sidebarPanel(
+                      selectInput("variable",
+                                  "Climate Variable",
+                                  choices = names(plot_info)),
+                      
+                      h4("Summary Statistics"),
+                      tableOutput("summaryTable")
+                    ),
+                    
+                    mainPanel(
+                      plotOutput("calendarPlot", height = 500)
+                    )
+                  )
+              )
+              
       ),
 
+      tabItem("mcp_tab", mod_elephant_tracking_UI("kaudulla")),
+      
       # ── TAB 7 : Data Table ───────────────────────────────────────────────────
-      tabItem(
-        "data_tab",
-        fluidRow(
-          box(
-            title = "\U0001F4CB GPS Observation Records",
-            width = 12, solidHeader = TRUE,
-            DTOutput("data_table")
-          )
-        )
+      tabItem("data_tab",
+              fluidRow(
+                box(
+                  title = "\U0001F4CB GPS Observation Records",
+                  width = 12, solidHeader = TRUE,
+                  DTOutput("data_table")
+                )
+              )
       )
     )
   )
