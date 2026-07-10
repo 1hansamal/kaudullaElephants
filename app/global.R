@@ -43,7 +43,7 @@ ELEPHANT_COLOURS <- c(
 )
 
 # ── Load data ──────────────────────────────────────────────────────────────────
-DATA_PATH <- here("data/kaudulla_elephants_clean_imputed.csv")
+DATA_PATH <- here("data/kaudulla_elephants_clean.csv")
 
 load_data <- function(path) {
   df <- read.csv(path, stringsAsFactors = FALSE)
