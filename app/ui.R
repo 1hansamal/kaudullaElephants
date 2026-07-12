@@ -1,6 +1,5 @@
-#==============================================================
-# 5. UI
-#==============================================================
+
+
 ui <- dashboardPage(
   skin = "green",
   
@@ -35,9 +34,10 @@ ui <- dashboardPage(
       menuItem("Both Coordinates",   tabName = "both_tab", icon = icon("layer-group")),
       menuItem("Heat Maps",          tabName = "heat_tab", icon = icon("fire")),
       menuItem("Elephant Tracking", tabName = "tracking_tab",icon = icon("map")),
+      menuItem("Live Elephant Path", tabName = "live_tab", icon = icon("play")),
       menuItem("Migration & Climate", tabName = "climate_tab",icon = icon("globe")),
-      menuItem("Home Range & Speed", tabName = "mcp_tab", icon = icon("compass")),
-      menuItem("Data Table",         tabName = "data_tab", icon = icon("table"))
+      menuItem("Data Table",         tabName = "data_tab", icon = icon("table")),
+      menuItem("Home Range & Speed", tabName = "mcp_tab",  icon = icon("compass"))
     ),
     
     tags$hr(style = "border-color:#444; margin:4px 0;"),
@@ -66,6 +66,12 @@ ui <- dashboardPage(
                min   = min(elephants_df$date_parsed, na.rm = TRUE),
                max   = max(elephants_df$date_parsed, na.rm = TRUE),
                format = "dd M yyyy"
+             ),
+             
+             selectInput(
+               "sel_month", "Month",
+               choices  = month_choices,
+               selected = "all"
              ),
              
              checkboxInput("add_smooth", "Add LOESS smoother", value = FALSE),
@@ -480,6 +486,20 @@ table.dataTable td{
               ),
               fluidRow(
                 box(
+                  title = "\U0001F5FA Live Position — Synced with Latitude Chart",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Hover over a point on the Latitude vs Time chart above:",
+                    "the map below jumps to that elephant's position at that",
+                    "moment and draws the path travelled up to it, so you can",
+                    "see exactly where — and in which direction — it moved."
+                  ),
+                  leafletOutput("sync_map_lat", height = "420px")
+                )
+              ),
+              fluidRow(
+                box(
                   title = "\U0001F4DA Literature Context — Latitude & Elephant Ranging in Sri Lanka",
                   width = 12, solidHeader = TRUE,
                   tags$div(style = "display:flex; flex-wrap:wrap; gap:20px; padding:4px 0;",
@@ -532,6 +552,20 @@ table.dataTable td{
                     "(Pastorini et al. 2010; Wildlife Dept. Sri Lanka 2023 Annual Report)."
                   ),
                   plotlyOutput("plot_lon", height = "460px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F5FA Live Position — Synced with Longitude Chart",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Hover over a point on the Longitude vs Time chart above:",
+                    "the map below jumps to that elephant's position at that",
+                    "moment and draws the path travelled up to it, so you can",
+                    "see exactly where — and in which direction — it moved."
+                  ),
+                  leafletOutput("sync_map_lon", height = "420px")
                 )
               ),
               fluidRow(
@@ -590,6 +624,19 @@ table.dataTable td{
                     "movement toward agricultural areas on the eastern boundary."
                   ),
                   plotlyOutput("plot_both", height = "600px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F5FA Live Position — Synced with Lat/Lon Chart",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Hover over a point on the Lat/Lon chart above: the map",
+                    "below jumps to that elephant's position at that moment",
+                    "and draws the path travelled up to it."
+                  ),
+                  leafletOutput("sync_map_both", height = "420px")
                 )
               ),
               fluidRow(
@@ -718,110 +765,326 @@ table.dataTable td{
       
       # ── TAB 5 : Elephant Tracking ────────────────────────────────────────────────────
       tabItem("tracking_tab",
-              div(class = "panel-box",
-                  
-                  div(class = "section-title",
-                      "🗺️ Elephant Tracking Overview"
-                  ),
-                  
-                  div(class = "sub-title",
-                      "Interactive Map with Satellite View"
-                  ),
-                  
+              fluidRow(
+                box(
+                  title = "🗺️ Elephant Tracking Overview",
+                  width = 12,
+                  solidHeader = TRUE,
                   leafletOutput("tracking_map", height = 600)
+                )
               ),
               
-              div(class = "panel-box",
+              fluidRow(
+                box(
+                  title = "📊 GPS Tracking Data by Month",
+                  width = 12,
+                  solidHeader = TRUE,
                   
-                  div(class = "sub-title",
-                      "📊 Tracking Data Visualization"
-                  ),
-                  
-                  plotOutput("tracking_plot", height = 500, width = "100%")
+                  tags$div(
+                    style = "text-align:center;",
+                    
+                    tags$a(
+                      href = "https://zubhp3-amali-priyanwada.shinyapps.io/elephants_by_month/",
+                      target = "_blank",
+                      
+                      tags$button(
+                        "Click here for the Month Wise GPS Tracking Data Analysis",
+                        style = "
+            background-color:#2E8B57;
+            color:white;
+            border:none;
+            padding:12px 25px;
+            font-size:16px;
+            font-weight:bold;
+            border-radius:8px;
+            cursor:pointer;
+          "
+                      )
+                    )
+                  )
+                )
               ),
               
-              div(class = "panel-box",
+              useShinyjs(), # Initialize shinyjs to handle button color swapping
+              theme = bslib::bs_theme(version = 5, bootswatch = "minty"),
+              
+              fluidRow(
+                box(
+                  title = "🐘 GPS Tracking Data by Individual Elephant",
+                  width = 12,solidHeader = TRUE,
+                  useShinyjs(),
+                  theme = bslib::bs_theme(version = 5, bootswatch = "minty"),
                   
-                  div(class = "sub-title",
-                      "👥 GPS Tracking Data by Individual Elephant"
+                  div(
+                    style = "padding: 5px 15px 0px 15px; display: flex; justify-content: space-between; align-items: center;",
+                    tags$h4("Kaudulla Elephant Tracking Timeline", style = "margin: 0; font-weight: bold; font-size: 1.3rem;"),
+                    
+                    div(
+                      style = "display: flex; align-items: center; gap: 15px; background-color: #f8f9fa; padding: 4px 12px; border-radius: 6px; border: 1px solid #e3e6f0;",
+                      div(
+                        style = "min-width: 90px; text-align: center;",
+                        tags$strong(textOutput("current_month_ui"), style = "font-size: 1.1rem; color: #2c3e50;")
+                      ),
+                      div(
+                        style = "display: flex; gap: 5px;",
+                        actionButton("btn_prev", "Back ⏮", class = "btn btn-sm btn-secondary", style = "padding: 2px 8px;"),
+                        actionButton("btn_toggle", "▶ Play", class = "btn btn-sm btn-success", style = "padding: 2px 12px;"), 
+                        actionButton("btn_next", "Next ⏭", class = "btn btn-sm btn-secondary", style = "padding: 2px 8px;")
+                      )
+                    )
                   ),
+                  hr(style = "margin: 5px 0 10px 0;"),
                   
-                  plotOutput("tracking_by_elephant", height = 800, width = "100%")
+                  div(
+                    style = "width: 100%; height: 83vh; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 0 10px;",
+                    imageOutput("elephant_plot", width = "auto", height = "100%")
+                  )
+                )
+              )
+      ),
+      
+      
+      
+      
+      
+      
+      # ── TAB 5b : Live Elephant Path ──────────────────────────────────────────
+      tabItem("live_tab",
+              fluidRow(
+                box(
+                  title = "\U0001F418 Choose Elephant", width = 4, solidHeader = TRUE,
+                  selectInput(
+                    "live_elephant", NULL,
+                    choices  = sort(unique(elephants_df$name)),
+                    selected = sort(unique(elephants_df$name))[1]
+                  ),
+                  selectInput(
+                    "live_month", "Month",
+                    choices  = month_choices,
+                    selected = "all"
+                  ),
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin: -6px 0 10px;",
+                    "Elephant + Month here are specific to this page.",
+                    "The sidebar's Date Range still applies too.",
+                    "Press \u25B6 on the slider to animate, or drag it."
+                  ),
+                  uiOutput("live_info_box")
+                ),
+                box(
+                  title = "\U0001F3AC Playback", width = 8, solidHeader = TRUE,
+                  uiOutput("live_slider_ui")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F5FA Live Map — Path Drawn in Real Time",
+                  width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "The shaded polygon is the elephant's home-range (convex",
+                    "hull) built only from the fixes seen so far — watch it",
+                    "expand and reshape as more of the path is revealed."
+                  ),
+                  leafletOutput("live_map", height = 500)
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4D0 Home-Range (Hull) Area — Growing Live", width = 12, solidHeader = TRUE,
+                  tags$p(
+                    style = "color:#666; font-size:11px; margin-bottom:6px;",
+                    "Convex-hull area (km\u00B2) computed from only the fixes",
+                    "revealed so far. Needs at least 3 fixes to form a polygon."
+                  ),
+                  plotlyOutput("live_hull_plot", height = "300px")
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "\U0001F4CD Latitude vs Time (live)", width = 6, solidHeader = TRUE,
+                  plotlyOutput("live_lat_plot", height = "320px")
+                ),
+                box(
+                  title = "\U0001F4CD Longitude vs Time (live)", width = 6, solidHeader = TRUE,
+                  plotlyOutput("live_lon_plot", height = "320px")
+                )
               )
       ),
       
       
       # ── TAB 6 : Migration & Climate ────────────────────────────────────────────────────
       tabItem("climate_tab",
-              div(class = "panel-box",
+              
+              fluidRow(
+                box(
+                  title = "🐘 Elephant Tracking Data Availability",
+                  width = 12,  # <-- Changed from 6 to 12 for full width
+                  solidHeader = TRUE,
                   
-                  div(class = "section-title",
-                      "🐘 Elephant Tracking Data Availability"
-                  ),
-                  sidebarLayout(
-                    sidebarPanel(
+                  # Make the select input smaller and inline
+                  fluidRow(
+                    column(
+                      width = 3,  # Elephant selector takes 1/4 of the row
                       selectInput(
                         inputId = "selected_elephant",
                         label = "Select Elephant Name:",
                         choices = elephant_names,
                         selected = elephant_names[1]
-                      ),
-                      hr(),
-                      helpText("This heatmap shows the percentage of valid GPS records captured per day (max 24 records/day).")
+                      )
                     ),
-                    
-                    mainPanel(
-                      plotOutput("calendar_plot", height = "600px")
+                    column(
+                      width = 9,  # Help text takes remaining 3/4
+                      helpText(
+                        "This heatmap shows the percentage of valid GPS records captured per day (max 24 records/day)."
+                      )
                     )
-                  )
-              ),
-              
-              
-              div(class = "panel-box",
-                  
-                  div(class = "section-title",
-                      "🐘 Elephant Migration Map"
-                  ),
-                  sidebarLayout(
-                    sidebarPanel(
-                      selectInput("year", "Select Year", choices = NULL),
-                      selectInput("month", "Select Month", choices = sprintf("%02d", 1:12)),
-                      selectInput("elephant", "Select Elephant", choices = NULL)
-                    ),
-                    
-                    mainPanel(
-                      leafletOutput("map", height = 600)
-                    )
-                  )
-              ),
-              
-              
-              div(class = "panel-box",
-                  
-                  div(class = "section-title",
-                      "🌡 Climate Calendar Analysis"
                   ),
                   
+                  # Full width plot
+                  plotOutput("calendar_plot", height = "500px")  # Slightly taller for better visibility
+                )
+              ),
+              
+              fluidRow(
+                box(
+                  title = "🐘 Elephant Migration Map",
+                  width = 12,
+                  solidHeader = TRUE,
+                  
                   sidebarLayout(
-                    
                     sidebarPanel(
-                      selectInput("variable",
-                                  "Climate Variable",
-                                  choices = names(plot_info)),
+                      width = 2,
                       
-                      h4("Summary Statistics"),
-                      tableOutput("summaryTable")
+                      selectInput("year", "Select Year", choices = NULL),
+                      
+                      tags$div(
+                        style = "max-width:150px;",
+                        selectInput(
+                          "month",
+                          "Select Month",
+                          # names shown to the user ("January"...) map to the
+                          # "01".."12" values used everywhere else in the app
+                          choices = setNames(sprintf("%02d", 1:12), month.name),
+                          multiple = FALSE
+                        )
+                      ),
+                      
+                      tags$div(
+                        style = "max-width:130px;",
+                        selectInput(
+                          "elephant",
+                          "Select Elephant",
+                          choices = NULL
+                        )
+                      ),
+                      
+                      tags$div(
+                        style = "max-width:150px;",
+                        selectInput(
+                          "select_week",
+                          "Select Week",
+                          choices = c("All Weeks", "Week 1", "Week 2", "Week 3", "Week 4"),
+                          selected = "All Weeks",
+                          multiple = TRUE
+                        )
+                      ),
+                      
+                      checkboxInput(
+                        "show_seq_numbers",
+                        "Show point sequence numbers",
+                        value = FALSE
+                      )
                     ),
                     
                     mainPanel(
-                      plotOutput("calendarPlot", height = 500)
+                      width = 10,
+                      
+                      tags$div(
+                        style = "text-align:right; margin-bottom:8px;",
+                        actionButton(
+                          "open_map_newtab",
+                          "🔗 Open Map in New Tab",
+                          class = "btn-sm",
+                          style = "background:#2E8B57; color:white; border:none;"
+                        )
+                      ),
+                      leafletOutput("map", height = 600),
+                      
+                      tags$p(
+                        style = "font-size:11px; color:#666; line-height:1.45; margin-top:10px;",
+                        tags$em(
+                          "Note: the GPS collars record ", tags$b("hourly"), " fixes, so up ",
+                          "to 24 points can appear per elephant per day. However, the data has ",
+                          tags$b("missing values"), " - some hours simply have no reading ",
+                          "(the collar missed a fix, lost signal, etc.), so gaps in the track ",
+                          "are expected, not an error. When enabled, the numbers above are ",
+                          "based ", tags$b("only on the readings that are actually available"),
+                          " (missing hours are skipped, not counted), showing the ",
+                          tags$b("order"), " in which those available fixes occurred ",
+                          "(1 = earliest fix shown, highest = most recent available fix) - ",
+                          "they are ", tags$b("not"), " day numbers, hours of the day, or dates."
+                        )
+                      )
                     )
                   )
-              )
+                )
+              ),
               
+              
+              fluidRow(
+                box(
+                  title = "🌡 Climate Calendar Analysis",
+                  width = 12,
+                  solidHeader = TRUE,
+                  
+                  # --------------------------
+                  # First row
+                  # --------------------------
+                  fluidRow(
+                    
+                    column(
+                      width = 3,
+                      
+                      selectInput(
+                        "variable",
+                        "Climate Variable",
+                        choices = names(plot_info)
+                      )
+                      
+                    ),
+                    
+                    column(
+                      width = 9,
+                      
+                      helpText(
+                        "This calendar heatmap displays daily values of the selected climate variable."
+                      )
+                      
+                    )
+                    
+                  ),
+                  
+                  # --------------------------
+                  # Calendar
+                  # --------------------------
+                  plotOutput(
+                    "calendarPlot",
+                    height = "550px"
+                  ),
+                  
+                  hr(),
+                  
+                  # --------------------------
+                  # Summary
+                  # --------------------------
+                  h4("Summary Statistics"),
+                  
+                  tableOutput("summaryTable")
+                  
+                )
+              )
       ),
-
-      tabItem("mcp_tab", mod_elephant_tracking_UI("kaudulla")),
       
       # ── TAB 7 : Data Table ───────────────────────────────────────────────────
       tabItem("data_tab",
@@ -832,6 +1095,86 @@ table.dataTable td{
                   DTOutput("data_table")
                 )
               )
+      ),
+      tabItem(
+        "mcp_tab",
+        div(
+          class = "section-title",
+          bsicons::bs_icon("compass"), " Home Range, Movement & Speed"
+        ),
+        div(
+          class = "section-description",
+          "Minimum convex polygon (MCP) home ranges, GPS movement tracks, ",
+          "and speed/direction metrics for elephants tracked at Kaudulla National Park."
+        ),
+        fluidRow(
+          box(
+            title = "Filters", width = 12, solidHeader = TRUE,
+            tags$div(
+              style = "display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;",
+              tags$div(
+                style = "min-width:220px;",
+                checkboxGroupInput(
+                  "mcp_sex_filter", "Sex",
+                  choices = mcp_unique_sexes,
+                  selected = mcp_unique_sexes
+                )
+              ),
+              tags$div(
+                style = "min-width:280px; padding-top:4px; color:#64748b; font-size:13px; line-height:1.6;",
+                icon("circle-info"), " Elephant, Date Range, and Month are controlled from the ",
+                tags$b("sidebar"), " on the left and apply to this tab too, so it stays in sync ",
+                "with the other plots."
+              )
+            )
+          )
+        ),
+        fluidRow(
+          valueBoxOutput("mcp_vb_elephants", width = 3),
+          valueBoxOutput("mcp_vb_points", width = 3),
+          valueBoxOutput("mcp_vb_speed", width = 3),
+          valueBoxOutput("mcp_vb_distance", width = 3)
+        ),
+        fluidRow(
+          box(
+            title = "Tracking Points & Minimum Convex Polygons",
+            width = 12, solidHeader = TRUE,
+            leafletOutput("mcp_hull_map", height = "600px")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Cumulative Distance Traveled Over Time",
+            width = 12, solidHeader = TRUE,
+            plotlyOutput("mcp_timeline_plot", height = "550px")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Home Range Area by Elephant",
+            width = 12, solidHeader = TRUE,
+            plotlyOutput("mcp_area_bar_chart", height = "550px")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Movement Direction by Elephant (16 compass sectors)",
+            width = 6, solidHeader = TRUE,
+            uiOutput("mcp_rose_individual_ui")
+          ),
+          box(
+            title = "Overall Movement Direction — All Selected Elephants Combined",
+            width = 6, solidHeader = TRUE,
+            plotlyOutput("mcp_rose_population", height = "600px")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Per-Elephant Summary",
+            width = 12, solidHeader = TRUE,
+            DTOutput("mcp_summary_table")
+          )
+        )
       )
     )
   )
