@@ -1,5 +1,3 @@
-
-
 ui <- dashboardPage(
   skin = "green",
   
