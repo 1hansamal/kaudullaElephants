@@ -7,7 +7,7 @@ ui <- dashboardPage(
                height = "22px", style = "margin-right:8px; vertical-align:middle;"),
       "Kaudulla Elephant Tracker"
     ),
-    titleWidth = 320
+    titleWidth = 400
   ),
   
   dashboardSidebar(
